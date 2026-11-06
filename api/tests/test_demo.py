@@ -26,7 +26,10 @@ def test_kvkk_vurgular_ve_maskeler():
 def test_sql_sekmesi_yazmayi_reddeder():
     sutunlar, satirlar, durum = servis.sql_calistir("SELECT COUNT(*) AS n FROM musteriler")
     assert sutunlar == ["n"] and satirlar[0][0] > 0 and durum.startswith("✅")
-    assert servis.sql_calistir("DELETE FROM musteriler")[2].startswith("❌")
+    assert "Güvenlik engelledi" in servis.sql_calistir("DELETE FROM musteriler")[2]
+    assert "ikinci bir sorgu" in servis.sql_calistir("SELECT * FROM sqlite_master; DROP TABLE siparisler")[2]
+    assert "SQL hatası" in servis.sql_calistir("SELECT * FROM olmayan_tablo")[2]  # gerçek hata ayrı görünür
+    assert servis.sql_calistir("  ")[2] == "Bir sorgu yaz."
 
 
 def test_anahtar_yoksa_asistan_kibarca_kapanir(monkeypatch):

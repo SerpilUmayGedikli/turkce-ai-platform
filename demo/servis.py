@@ -172,11 +172,27 @@ def belge_ara(sorgu: str, yontem: str) -> tuple[str, list[list[str]]]:
 
 
 # ---------------------------------------------------------------- güvenli SQL
+def sql_durumu(hata: Exception) -> str:
+    """Güvenlik engelini (beklenen davranış) gerçek SQL hatasından ayırır."""
+    mesaj = str(hata)
+    if "yalnızca bir sorgu" in mesaj:
+        return ("🛡️ **Güvenlik engelledi (beklenen davranış):** `;` ile ikinci bir sorgu eklenmiş. "
+                "Bu, SQL enjeksiyonunun klasik yolu; tek seferde yalnızca bir sorgu çalışır.")
+    if "not authorized" in mesaj or "readonly" in mesaj:
+        return ("🛡️ **Güvenlik engelledi (beklenen davranış):** yalnızca okuma (SELECT) izinli. "
+                "Silme, değiştirme, tablo düşürme ve sistem komutları yetkilendirici tarafından reddedilir.")
+    if "interrupted" in mesaj:
+        return "⏱️ **Süre sınırı:** sorgu çok uzun sürdüğü için kesildi."
+    return f"⚠️ **SQL hatası:** `{mesaj}`. Tablolar: kategoriler, urunler, musteriler, siparisler, siparis_kalemleri"
+
+
 def sql_calistir(sql: str) -> tuple[list[str], list[list[Any]], str]:
+    if not (sql or "").strip():
+        return [], [], "Bir sorgu yaz."
     try:
-        sutunlar, satirlar = sorgula(sql or "")
+        sutunlar, satirlar = sorgula(sql)
     except Exception as e:  # yetkilendirici reddi, sözdizimi hatası, süre aşımı
-        return [], [], f"❌ Reddedildi / hata: `{type(e).__name__}: {e}`"
+        return [], [], sql_durumu(e)
     return sutunlar, [list(s) for s in satirlar], f"✅ {len(satirlar)} satır (en fazla 50 gösterilir)"
 
 

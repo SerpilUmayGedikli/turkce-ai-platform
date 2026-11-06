@@ -9,6 +9,7 @@ from __future__ import annotations
 import threading
 
 import gradio as gr
+import pandas as pd  # gradio'nun bağımlılığı
 
 import servis
 
@@ -108,7 +109,8 @@ def arayuz() -> gr.Blocks:
 
         with gr.Tab("🗄️ Güvenli SQL"):
             gr.Markdown("Modelin yazdığı SQL'e güvenilmez: salt okunur bağlantı, yalnızca SELECT'e izin veren "
-                        "yetkilendirici, tek sorgu, 50 satır ve süre sınırı. `DELETE` örneğini dene. "
+                        "yetkilendirici, tek sorgu, 50 satır ve süre sınırı. Son iki örnek **saldırı denemesi**: "
+                        "reddedilmeleri beklenen davranıştır. "
                         "Türkçe ayrıntı: SQLite'ın `LIKE`'ı `Ş` harfini tanımaz, `tr_lower()` tanır.")
             sql = gr.Code("SELECT COUNT(*) FROM musteriler WHERE tr_lower(ad) LIKE 'ş%'", language="sql",
                           label="SQL")
@@ -129,8 +131,9 @@ def ornek_listesi(bilesen, ornekler: list[str], baslik: str) -> gr.Dataset:
 
 def sql_goster(s):
     sutunlar, satirlar, durum = servis.sql_calistir(s)
-    if not sutunlar:  # reddedildi: eski sonuç ekranda kalmasın
-        return gr.update(value=None), durum
+    if not sutunlar:  # reddedildi: önceki sorgunun tablosu ve başlıkları ekranda kalmasın
+        # Boş tablo verince Gradio eski başlıkları tutuyor; açık bir satırla değiştiriyoruz
+        return gr.update(value=pd.DataFrame({"Sonuç": ["Sorgu çalıştırılmadı"]})), durum
     return gr.update(value=satirlar, headers=sutunlar), durum
 
 
