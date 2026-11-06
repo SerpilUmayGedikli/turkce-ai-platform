@@ -34,8 +34,12 @@ Hedef sohbet botu değil: kurumsal Türkçe kullanım senaryoları için ölçü
 |---|---|---|
 | Google Gemini | https://aistudio.google.com/apikey | Cömert ücretsiz kota, araç çağırmada iyi → varsayılan |
 | Groq | https://console.groq.com/keys | Çok hızlı açık modeller (Llama vb.) |
-| OpenRouter | https://openrouter.ai/keys | Qwen, Kimi, DeepSeek'in `:free` sürümleri |
+| OpenRouter | https://openrouter.ai/keys | Ücretsiz Nemotron/Gemma; kredi ile Qwen, Kimi (Kasım 2026'da ücretsiz Qwen/Kimi yok) |
+| Alibaba Model Studio | https://modelstudio.console.alibabacloud.com | Qwen + Kimi tek anahtarla, yeni kullanıcıya model başına ~1M token (Singapur) |
 
+> **İpucu:** Gemini'nin ücretsiz kotası **model başına** ayrı işler. Ana model dolunca
+> `gemini-3` / `gemini-lite` takma adları aynı anahtarla çalışmaya devam eder.
+>
 > Ücretsiz kotalar ve model adları sık değişir. Çalışmazsa `gateway/config.yaml` içindeki model adını
 > sağlayıcının güncel listesiyle karşılaştır. Ücretsiz katmanlarda gönderdiğin veriler eğitim için
 > kullanılabilir: gerçek kişisel veri gönderme (bu yüzden KVKK Kalkanı projesi var).
@@ -128,12 +132,71 @@ Agent, Türkçe soruları bir e-ticaret veritabanında SQL'e çevirip çalışt�
 - **Ölçüm:** 36 Türkçe soru (kolay/orta/zor, Türkçe karakter, KVKK), altın SQL'ler.
   Execution accuracy: SQL metni değil, sorgunun **sonucu** karşılaştırılır.
 
+### Sonuçlar: Türkçe karakter alt seti (8 soru)
+
+| Ölçüm | Model | Doğruluk | Süre/soru | ISPARTA sorusu |
+|---|---|---|---|---|
+| v1 (`tr_lower`) | Gemini 3.8 Flash\* | %75 | 121 sn | ✗ `tr_lower(sehir) = 'isparta'` |
+| v1.1 (`tr_katla`) | Gemini 3 Flash | **%88** | 4.9 sn | ✓ `tr_katla(sehir) = tr_katla('ISPARTA')` |
+
+\* Cevabı gerçekte `gemini-3.6-flash` verdi: sağlayıcı istenen modeli arka planda değiştirebiliyor,
+bu yüzden rapor cevabı **gerçekte veren modeli** de yazar. İki satırdaki modeller farklı olduğu için
+artışın tamamı `tr_katla`'ya ait sayılmamalı. Isparta sorusu ise doğrudan bu düzeltmenin etkisini gösterir.
+Kalan hata ("Soyadı ışık olan müşterilerin adları") bir Türkçe hatası değil: model aynı adı iki kez
+listeledi, altın SQL `DISTINCT` kullanıyor. Altın cevap, sonuçlara bakılarak değiştirilmedi.
+36 soruluk tam ölçüm ve model karşılaştırması ücretsiz kotalar nedeniyle parça parça (`--devam`) sürüyor.
+
 ```bash
-cd api && python -m eval.text2sql_degerlendir --model gemini --bekle 4
+cd api && python -m eval.text2sql_degerlendir --model gemini-3 --bekle 4
+cd api && python -m eval.text2sql_degerlendir --model gemini-3 --bekle 4 --devam   # kota yarıda kestiyse
 ```
 
 Demo veritabanı (`api/data/magaza.db`) ilk kullanımda otomatik üretilir: 320 müşteri, 3200 sipariş,
 rastgele ve sahte kişisel verilerle.
+
+## Türkçe Hibrit Belge Arama (RAG)
+
+Agent, mağazanın politika belgelerinde (iade, kargo, iptal, ödeme, garanti, KVKK...) arama yapıp
+cevabı kaynağıyla verir (`belge_ara` aracı). Aynı mağazanın veritabanı da bağlı olduğu için agent
+"siparişim kargoda mı?" sorusuna SQL ile, "kargodaki siparişi iptal edebilir miyim?" sorusuna
+belgeyle cevap verir.
+
+**Türkçe sorun:** Türkçe eklemeli bir dil. "iade", "iadesi", "iadelerde", "iadenizin" aynı kelime ama
+kelime eşleşmesine dayalı arama (BM25) bunları farklı sayar. Embedding anlamı yakalar ama
+"taksit", "48 saat" gibi kesin terimlerde zayıf kalır.
+
+**Çözüm:** BM25 (kütüphanesiz, `app/rag/bm25.py`) + Türkçe ön işleme (Türkçe kurallı küçük harf,
+kesme işaretli ekler, kök/önek) + çok dilli embedding (fastembed, CPU, PyTorch'suz), RRF ile birleştirme.
+
+### Sonuçlar ([tam rapor](api/eval/sonuclar/rag_rapor.md)): 50 soru, 47 parça
+
+| Yöntem | Recall@1 | Recall@5 | MRR | cekim (16) | esanlam (18) |
+|---|---|---|---|---|---|
+| BM25, düz kelime | 50% | 74% | 0.59 | 69% | 56% |
+| BM25 + Snowball kök | 64% | 80% | 0.70 | 94% | 50% |
+| BM25 + ilk 5 harf | 74% | 86% | 0.80 | 94% | 67% |
+| Embedding (MiniLM çok dilli) | 66% | 86% | 0.75 | 81% | 78% |
+| **Hibrit (ilk 5 harf + embedding)** | 72% | **94%** | **0.80** | **100%** | **83%** |
+
+*cekim: aynı kelime farklı ekle ("İadelerde kargo ücretini kim ödüyor?"); esanlam: farklı kelimeyle
+("Paramı ne zaman geri alırım?"). İki sütun Recall@5. Belgedeki kelimelerle sorulan 16 soruyu tüm yöntemler buldu.*
+
+**Bulgular:**
+- Ek sorunu gerçek: düz BM25, ekli sorularda %69'da kalıyor; kök/önek ile **%94**.
+- **Basit olan kazandı:** "ilk 5 harf" kesmesi, Snowball kök bulucusundan daha iyi (%86 / %80).
+  Sebebi test olarak kayıtlı: Snowball `iadelerde`→`iade` yapıyor ama `iade`→`ia` yaparak kendi
+  kökünü bozuyor.
+- Kelime araması eş anlamlılarda çaresiz ("kurye" ≠ "kargo görevlisi"), embedding ise ekli kelimelerde
+  ve nadir terimlerde kaçırıyor. İkisi birbirinin açığını kapatıyor: hibrit, iki türde de en iyisi.
+- Hâlâ kaçanlar, kelime örtüşmesi hiç olmayan sorular: "Telefonum suya düştü" (belgede: "sıvı teması").
+
+**Dürüstlük notları:** Sorular ve belgeler aynı kişi tarafından yazıldı (gerçek kullanıcı soruları daha
+dağınık olur). Sorular sonuçlardan önce yazıldı ve değiştirilmedi. Varsayılan yöntem (`hibrit-on5`) bu
+setteki sonuca bakılarak seçildi; bu yüzden %94 iyimser bir tahmin. Ayrı bir doğrulama seti gerekli.
+
+```bash
+cd api && python -m eval.rag_degerlendir     # API anahtarı gerekmez, model ilk seferde ~220 MB iner
+```
 
 ## Yol haritası
 
@@ -143,7 +206,9 @@ rastgele ve sahte kişisel verilerle.
 - [ ] **KVKK v2:** Ad-soyad/adres için Türkçe NER, Presidio ile karşılaştırma, ayrı bir doğrulama seti
 - [x] **Hafta 5–6:** Türkçe Text-to-SQL aracı + 36 soruluk test seti v1 (execution accuracy)
 - [ ] **Text-to-SQL v2:** 150 soruya genişletme, modelleri (Gemini/Qwen/Kimi/yerel) karşılaştırma
-- [ ] **Hafta 7–8:** Türkçe hibrit arama (kök bulma + BM25 + embedding), Recall@5
+- [x] **Hafta 7–8:** Türkçe hibrit arama (kök/önek + BM25 + embedding, RRF), 50 soruda Recall@5
+- [ ] **RAG v2:** Ayrı doğrulama seti, gerçek kullanıcı soruları, reranker, cevap doğruluğu (faithfulness)
+- [ ] **Canlı demo:** Hugging Face Spaces + Gradio (SQL + belge + KVKK tek sayfada)
 - [ ] **Hafta 9–10:** Model router: soruya göre ucuz/güçlü model seçimi, maliyet ve doğruluk raporu
 - [ ] **Hafta 11–12:** Gözlemlenebilirlik (Langfuse), canlı demo, değerlendirme raporu
 

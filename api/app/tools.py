@@ -139,6 +139,25 @@ def sql_calistir(sorgu: str) -> str:
     return tablo_metni(*sorgula(sorgu))
 
 
+# ---------------------------------------------------------------- belge arama (RAG)
+@arac(
+    "belge_ara",
+    "Mağazanın politika belgelerinde (iade, değişim, kargo, iptal, ödeme, taksit, fatura, garanti, "
+    "KVKK, üyelik, kupon, puan, müşteri hizmetleri) arama yapar ve en ilgili 3 bölümü kaynağıyla "
+    "döner. Kural/süre/ücret sorularında kullan; cevabı yalnızca dönen metne dayandır ve kaynağı belirt. "
+    "Metinde cevap yoksa bilmediğini söyle.",
+    {
+        "type": "object",
+        "properties": {"sorgu": {"type": "string", "description": "Türkçe arama ifadesi, örn: iade kargo ücreti"}},
+        "required": ["sorgu"],
+    },
+)
+def belge_ara(sorgu: str) -> str:
+    from .rag import varsayilan
+
+    return "\n\n".join(f"[{p.belge} › {p.baslik}]\n{p.metin}" for p in varsayilan().ara(sorgu, 3))
+
+
 def calistir(ad: str, argumanlar: dict[str, Any]) -> str:
     """Aracı çalıştırır. Hata olursa modeli düzeltebilmesi için hatayı metin olarak döner."""
     if ad not in KAYIT:

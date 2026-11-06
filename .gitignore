@@ -5,3 +5,4 @@ __pycache__/
 venv/
 .pytest_cache/
 api/data/*.db
+api/data/rag_onbellek/
