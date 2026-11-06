@@ -120,6 +120,25 @@ def tckn_dogrula(tckn: str) -> str:
     return "geçerli" if tckn_gecerli(temiz) else "geçersiz"
 
 
+# ---------------------------------------------------------------- veritabanı (Text-to-SQL)
+from .veritabani.sorgu import SEMA_ACIKLAMASI, sorgula, tablo_metni  # noqa: E402
+
+
+@arac(
+    "sql_calistir",
+    "Mağaza veritabanında salt okunur bir SQL SELECT sorgusu çalıştırır ve sonucu tablo olarak döner. "
+    "Satış, ürün, müşteri, sipariş sorularında kullan; sayıları asla tahmin etme. Hata alırsan "
+    "hata mesajına göre sorguyu düzeltip tekrar dene.\n\n" + SEMA_ACIKLAMASI,
+    {
+        "type": "object",
+        "properties": {"sorgu": {"type": "string", "description": "Tek bir SQLite SELECT sorgusu"}},
+        "required": ["sorgu"],
+    },
+)
+def sql_calistir(sorgu: str) -> str:
+    return tablo_metni(*sorgula(sorgu))
+
+
 def calistir(ad: str, argumanlar: dict[str, Any]) -> str:
     """Aracı çalıştırır. Hata olursa modeli düzeltebilmesi için hatayı metin olarak döner."""
     if ad not in KAYIT:

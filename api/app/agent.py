@@ -29,7 +29,8 @@ from .kvkk import Maskeleyici
 SISTEM_MESAJI = (
     "Sen Türkçe düşünen ve Türkçe cevap veren yardımcı bir asistansın. "
     "Hesaplama gerektiğinde hesap_makinesi aracını, tarih/saat gerektiğinde "
-    "simdiki_zaman aracını kullan; tahmin yürütme. Cevaplarını kısa ve net tut. "
+    "simdiki_zaman aracını kullan; mağaza verisiyle ilgili sorularda (satış, ürün, müşteri, "
+    "sipariş) sql_calistir aracıyla veritabanını sorgula; tahmin yürütme. Cevaplarını kısa ve net tut. "
     "Metinde [TCKN_1], [IBAN_1], [TELEFON_1] gibi etiketler görürsen bunlar gizlenmiş "
     "kişisel verilerdir: etiketleri aynen koru, değiştirme ve gerçek değeri tahmin etme. "
     "Bir araç gerçek değere ihtiyaç duyarsa etiketi argüman olarak ver."
@@ -105,9 +106,12 @@ def calistir(
             # Araç bizim makinemizde çalışır: gerçek değeri görebilir
             gercek_arg = kalkan.geri_yukle_derin(argumanlar) if kalkan else argumanlar
             sonuc = tools.calistir(cagri.function.name, gercek_arg)
-            adimlar.append(
-                {"arac": cagri.function.name, "argumanlar": argumanlar, "sonuc": sonuc}
-            )
+            adimlar.append({
+                "arac": cagri.function.name,
+                "argumanlar": argumanlar,      # modelin yazdığı (maskeli olabilir)
+                "calistirilan": gercek_arg,    # yerelde gerçekte çalışan
+                "sonuc": sonuc,
+            })
             # ...ama sonucu modele geri gönderirken yine maskeleriz
             mesajlar.append(
                 {"role": "tool", "tool_call_id": cagri.id, "content": gizle(sonuc)}

@@ -103,13 +103,46 @@ desteklenmiyor (sonraki adım: Türkçe NER modeli ile karşılaştırma).
 cd api && python -m eval.kvkk_veri_uret && python -m eval.kvkk_degerlendir
 ```
 
+## Türkçe Text-to-SQL
+
+Agent, Türkçe soruları bir e-ticaret veritabanında SQL'e çevirip çalıştırır:
+
+```
+"Geçen ay en çok ciro yapan kategori hangisi?"
+  → sql_calistir("SELECT c.ad FROM ... WHERE s.tarih BETWEEN '2026-10-01' AND '2026-10-31' ...")
+  → "Spor"
+```
+
+- **Güvenlik (modelin yazdığı SQL'e güvenilmez):** salt okunur bağlantı, yalnızca SELECT'e izin veren
+  SQLite yetkilendiricisi (DELETE/DROP/ATTACH/PRAGMA reddedilir), tek sorgu, 50 satır ve
+  süre sınırı. Hata mesajı modele döner, model sorguyu kendisi düzeltir.
+- **Türkçe sorun:** SQLite'ın `LOWER`/`LIKE` fonksiyonları Türkçe harfleri tanımaz:
+  `ad LIKE 'ş%'` sorgusu **0** müşteri, Türkçe kurallı `tr_lower(ad) LIKE 'ş%'` sorgusu **26** müşteri bulur.
+  Veritabanına Türkçe kurallı `tr_lower()` eklendi. İlk ölçümde Gemini'nin `tr_lower(sehir) = 'isparta'`
+  yazdığı görüldü: model "ISPARTA"yı **kafasında İngilizce kuralla** küçültmüştü (doğrusu `ısparta`).
+  Çözüm, dönüşümü modele bırakmamak oldu: `tr_katla()` iki tarafı da aynı şekilde normalleştirir
+  (I/İ/ı/i farkını yok sayar), model sadece `tr_katla(sehir) = tr_katla('ISPARTA')` yazar.
+- **KVKK ile birlikte:** "TC'si 40666836414 olan müşteri nerede?" sorusunda model yalnızca
+  `[TCKN_1]` etiketini görür ve SQL'e etiketi yazar; sorgu yerelde gerçek değerle çalışır.
+  Sorgu sonucundaki TCKN ve telefon da modele dönmeden önce maskelenir.
+- **Ölçüm:** 36 Türkçe soru (kolay/orta/zor, Türkçe karakter, KVKK), altın SQL'ler.
+  Execution accuracy: SQL metni değil, sorgunun **sonucu** karşılaştırılır.
+
+```bash
+cd api && python -m eval.text2sql_degerlendir --model gemini --bekle 4
+```
+
+Demo veritabanı (`api/data/magaza.db`) ilk kullanımda otomatik üretilir: 320 müşteri, 3200 sipariş,
+rastgele ve sahte kişisel verilerle.
+
 ## Yol haritası
 
 - [x] **Hafta 1–2:** Gateway, sıfırdan agent döngüsü, araç sistemi, testler
 - [ ] **Deney:** "Türkçe vergisi": aynı metnin Türkçede kaç kat fazla token tuttuğu (blog yazısı)
 - [x] **Hafta 3–4:** KVKK Kalkanı v1: TCKN, IBAN, telefon, e-posta, kart; precision/recall ölçümü
 - [ ] **KVKK v2:** Ad-soyad/adres için Türkçe NER, Presidio ile karşılaştırma, ayrı bir doğrulama seti
-- [ ] **Hafta 5–6:** Türkçe Text-to-SQL aracı + 150 soruluk test seti (execution accuracy)
+- [x] **Hafta 5–6:** Türkçe Text-to-SQL aracı + 36 soruluk test seti v1 (execution accuracy)
+- [ ] **Text-to-SQL v2:** 150 soruya genişletme, modelleri (Gemini/Qwen/Kimi/yerel) karşılaştırma
 - [ ] **Hafta 7–8:** Türkçe hibrit arama (kök bulma + BM25 + embedding), Recall@5
 - [ ] **Hafta 9–10:** Model router: soruya göre ucuz/güçlü model seçimi, maliyet ve doğruluk raporu
 - [ ] **Hafta 11–12:** Gözlemlenebilirlik (Langfuse), canlı demo, değerlendirme raporu
