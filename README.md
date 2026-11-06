@@ -198,6 +198,17 @@ setteki sonuca bakılarak seçildi; bu yüzden %94 iyimser bir tahmin. Ayrı bir
 cd api && python -m eval.rag_degerlendir     # API anahtarı gerekmez, model ilk seferde ~220 MB iner
 ```
 
+## Canlı demo
+
+Üç projeyi tek sayfada gösteren Gradio arayüzü ([ayrıntılar](demo/README.md)): agent sohbeti (modele
+giden maskeli metin, araç çağrıları ve SQL yan panelde görünür), KVKK maskeleme, 6 arama yönteminin
+karşılaştırması ve güvenli SQL denemesi. Asistan dışındaki sekmeler model anahtarı olmadan çalışır.
+
+```bash
+python demo/demo.py        # http://localhost:7860
+python demo/hazirla.py     # Hugging Face Spaces paketi → demo/space/
+```
+
 ## Yol haritası
 
 - [x] **Hafta 1–2:** Gateway, sıfırdan agent döngüsü, araç sistemi, testler
@@ -208,7 +219,8 @@ cd api && python -m eval.rag_degerlendir     # API anahtarı gerekmez, model ilk
 - [ ] **Text-to-SQL v2:** 150 soruya genişletme, modelleri (Gemini/Qwen/Kimi/yerel) karşılaştırma
 - [x] **Hafta 7–8:** Türkçe hibrit arama (kök/önek + BM25 + embedding, RRF), 50 soruda Recall@5
 - [ ] **RAG v2:** Ayrı doğrulama seti, gerçek kullanıcı soruları, reranker, cevap doğruluğu (faithfulness)
-- [ ] **Canlı demo:** Hugging Face Spaces + Gradio (SQL + belge + KVKK tek sayfada)
+- [x] **Canlı demo:** Gradio (SQL + belge + KVKK tek sayfada), Hugging Face Spaces paketi
+- [ ] **Demo yayını:** Space'e yükleme ve linkin README'ye eklenmesi
 - [ ] **Hafta 9–10:** Model router: soruya göre ucuz/güçlü model seçimi, maliyet ve doğruluk raporu
 - [ ] **Hafta 11–12:** Gözlemlenebilirlik (Langfuse), canlı demo, değerlendirme raporu
 
