@@ -111,6 +111,15 @@ def test_sorgu_sonucundaki_kisisel_veri_de_maskelenir():
     assert "40666836414" in sonuc.cevap  # kullanıcı gerçek değeri görür
 
 
+def test_devam_sadece_cevaplanan_sorulari_alir(tmp_path):
+    yol = tmp_path / "x.jsonl"
+    yol.write_text("\n".join(json.dumps(k, ensure_ascii=False) for k in [
+        {"soru": "a", "durum": "dogru"}, {"soru": "b", "durum": "api_hatasi"},
+        {"soru": "c", "durum": "yanlis"}]) + "\n", encoding="utf-8")
+    assert set(degerlendir.onceki_kayitlar(yol)) == {"a", "c"}  # kota hatası olan tekrar sorulur
+    assert degerlendir.onceki_kayitlar(tmp_path / "yok.jsonl") == {}
+
+
 def test_degerlendir_bir_dogru_ve_yanlis(monkeypatch):
     ornek = {"soru": "Kaç müşteri?", "etiket": ["kolay"], "sql": "SELECT COUNT(*) FROM musteriler"}
     for sql, beklenen in [("SELECT COUNT(id) FROM musteriler", "dogru"),

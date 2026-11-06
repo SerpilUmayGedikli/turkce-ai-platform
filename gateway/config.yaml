@@ -1,19 +1,12 @@
 # LiteLLM Gateway ayarları
-# Uygulama model adını değil, "takma adı" (hizli, akilli, yerel...) kullanır.
+# Uygulama model adını değil, "takma adı" (gemini, qwen, kimi...) kullanır.
 # Böylece sağlayıcı değiştirmek için kod değil, sadece bu dosya değişir.
 #
-# NOT: Ücretsiz model adları sık değişir. Kullanmadan önce kontrol et:
-#   - OpenRouter ücretsiz modeller: https://openrouter.ai/models?max_price=0
-#   - Groq modelleri:              https://console.groq.com/docs/models
-#   - Gemini modelleri:            https://ai.google.dev/gemini-api/docs/models
+# NOT: Model adları sık değişir. Kullanmadan önce kontrol et:
+#   - Alibaba Model Studio: https://www.alibabacloud.com/help/en/model-studio/models
+#   - Gemini modelleri:     https://ai.google.dev/gemini-api/docs/models
 
 model_list:
-  # Çok hızlı, ücretsiz kotası cömert -> basit sorular
-  - model_name: hizli
-    litellm_params:
-      model: groq/llama-3.3-70b-versatile
-      api_key: os.environ/GROQ_API_KEY
-
   # Güçlü ve ücretsiz, araç çağırmada (tool calling) iyi -> agent'ın varsayılanı
   - model_name: gemini
     litellm_params:
@@ -26,31 +19,86 @@ model_list:
       model: gemini/gemini-3.5-flash
       api_key: os.environ/GEMINI_API_KEY
 
-  # Qwen (OpenRouter üzerinden, ":free" sonekli modeller ücretsiz)
+  # Gemini ücretsiz kotası MODEL BAŞINA ayrı işler: biri dolunca diğerleri çalışabilir.
+  - model_name: gemini-3
+    litellm_params:
+      model: gemini/gemini-3-flash-preview
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-lite
+    litellm_params:
+      model: gemini/gemini-3.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+
+  # --- Alibaba Model Studio (DashScope): tek anahtarla Qwen VE Kimi ---------------
+  # Yeni kullanıcıya model başına ~1M token ücretsiz (90 gün, yalnızca Singapur bölgesi).
+  # OpenAI uyumlu uç nokta kullanıldığı için "openai/" ön eki + api_base yeterli.
   - model_name: qwen
     litellm_params:
-      model: openrouter/qwen/qwen3-235b-a22b:free
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: openai/qwen3.8-flash          # hızlı ve ucuz
+      api_base: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
 
-  # Kimi (Moonshot) - OpenRouter üzerinden
+  - model_name: qwen-plus
+    litellm_params:
+      model: openai/qwen3.7-plus           # dengeli
+      api_base: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+
+  - model_name: qwen-max
+    litellm_params:
+      model: openai/qwen3.8-max            # en güçlü Qwen
+      api_base: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+
   - model_name: kimi
     litellm_params:
-      model: openrouter/moonshotai/kimi-k2:free
+      model: openai/kimi-k3                # Moonshot AI, Model Studio üzerinden
+      api_base: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key: os.environ/DASHSCOPE_API_KEY
+
+  # --- OpenRouter ----------------------------------------------------------------
+  # Ücretsiz (anahtar yeter, kredi gerekmez; ücretsiz hesapta günde ~50 istek)
+  - model_name: gemma
+    litellm_params:
+      model: openrouter/google/gemma-4-31b-it:free
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # Yerel model: önce indir ->  docker compose exec ollama ollama pull qwen2.5:7b
+  - model_name: nemotron
+    litellm_params:
+      model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Ücretli (kredi yüklenirse): OpenRouter'da ücretsiz Qwen/Kimi YOK (Kasım 2026)
+  - model_name: qwen-or
+    litellm_params:
+      model: openrouter/qwen/qwen3.7-flash  # $0.03 / $0.13 (1M token)
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: kimi-or
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k2.6  # $0.65 / $3.41 (1M token)
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Yerel model (anahtar gerekmez): önce indir ->  ollama pull qwen2.5:7b
   - model_name: yerel
     litellm_params:
       model: ollama_chat/qwen2.5:7b
       api_base: os.environ/OLLAMA_API_BASE  # Docker: http://ollama:11434, yerel: http://localhost:11434
 
+  # Kullanılmıyor (Kasım 2026): Groq'ta Llama 3.3 70B kurumsal plana geçti, OpenRouter'da
+  # ücretsiz Qwen/Kimi kalmadı. Gerekirse açılabilir:
+  # - model_name: hizli
+  #   litellm_params: {model: groq/qwen/qwen3.8-27b, api_key: os.environ/GROQ_API_KEY}
+
 litellm_settings:
-  # Bir model hata verir ya da kota dolarsa sıradakine geç
+  # Bir model hata verir ya da kota dolarsa sıradakine geç.
+  # NOT: Ölçüm yaparken yedekleme sonucu bozabilir (Qwen düşerse cevabı Gemini verir).
+  # Değerlendirme script'i bu yüzden cevabı GERÇEKTE hangi modelin verdiğini raporlar.
   fallbacks:
-    - gemini: ["gemini-yedek", "hizli", "qwen", "yerel"]
-    - qwen: ["kimi", "gemini", "gemini-yedek", "yerel"]
-    - kimi: ["qwen", "gemini", "gemini-yedek", "yerel"]
-    - hizli: ["gemini", "gemini-yedek", "yerel"]
+    - gemini: ["gemini-yedek", "gemini-3", "gemini-lite"]
+    - qwen: ["qwen-plus", "gemini"]
+    - kimi: ["qwen-plus", "gemini"]
   num_retries: 1
   request_timeout: 120
 

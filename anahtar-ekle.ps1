@@ -2,9 +2,9 @@
 # Kullanım:  powershell -ExecutionPolicy Bypass -File .\anahtar-ekle.ps1
 
 $dosya = Join-Path $PSScriptRoot ".env"
-$secenekler = @{ "1" = "GEMINI_API_KEY"; "2" = "GROQ_API_KEY"; "3" = "OPENROUTER_API_KEY" }
+$secenekler = @{ "1" = "GEMINI_API_KEY"; "2" = "GROQ_API_KEY"; "3" = "OPENROUTER_API_KEY"; "4" = "DASHSCOPE_API_KEY" }
 
-Write-Host "Hangi anahtar?  1) Gemini   2) Groq   3) OpenRouter"
+Write-Host "Hangi anahtar?  1) Gemini   2) Groq   3) OpenRouter   4) Alibaba (Qwen + Kimi)"
 $secim = Read-Host "Seçim"
 $ad = $secenekler[$secim]
 if (-not $ad) { Write-Host "Geçersiz seçim."; exit 1 }

@@ -105,6 +105,12 @@ def rapor_yaz(kayitlar: list[dict], model: str) -> Path:
         f"# Türkçe Text-to-SQL Raporu: `{model}`\n",
         f"{len(tum_kayitlar)} soru. Durumlar: {dict(Counter(k['durum'] for k in tum_kayitlar))}\n",
     ]
+    gercek_modeller = Counter(k.get("model") for k in kayitlar if k.get("model"))
+    if gercek_modeller:
+        satirlar.append(f"Cevabı gerçekte veren model(ler): {dict(gercek_modeller)}\n")
+    if len(gercek_modeller) > 1:
+        satirlar.append("> ⚠️ Birden fazla model cevap vermiş: gateway yedeklemesi devreye girmiş olabilir. "
+                        "Bu rapor tek bir modelin ölçümü SAYILMAMALI.\n")
     if api_hatasi:
         satirlar.append(f"> ⚠️ {api_hatasi} soru API hatası (kota/ağ) nedeniyle cevapsız kaldı ve "
                         "doğruluk hesabına KATILMADI. Ölçüm eksik; tekrar çalıştırılmalı.\n")
@@ -132,30 +138,55 @@ def rapor_yaz(kayitlar: list[dict], model: str) -> Path:
     return yol
 
 
+def onceki_kayitlar(yol: Path) -> dict[str, dict]:
+    """Önceki çalıştırmada API hatası almadan cevaplanan sorular (soru metni -> kayıt).
+
+    Ücretsiz kotalar ölçümü yarıda kesebilir; --devam ile sadece eksik sorular sorulur.
+    """
+    if not yol.exists():
+        return {}
+    kayitlar = [json.loads(s) for s in yol.read_text(encoding="utf-8").splitlines() if s.strip()]
+    return {k["soru"]: k for k in kayitlar if k["durum"] != "api_hatasi"}
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="gemini")
     p.add_argument("--limit", type=int, default=0, help="ilk N soru (0 = hepsi)")
     p.add_argument("--etiket", default="", help="sadece bu etiketli sorular (ör. turkce)")
     p.add_argument("--bekle", type=float, default=0, help="sorular arası bekleme (sn), kota için")
+    p.add_argument("--devam", action="store_true",
+                   help="önceki çalıştırmada cevaplanan soruları atla (kota yarıda kestiyse)")
     a = p.parse_args()
 
     sorular = [s for s in SORULAR if not a.etiket or a.etiket in s["etiket"]]
     if a.limit:
         sorular = sorular[: a.limit]
     SONUC_KLASORU.mkdir(parents=True, exist_ok=True)
+    jsonl = SONUC_KLASORU / f"text2sql_{a.model}.jsonl"
+    hazir = onceki_kayitlar(jsonl) if a.devam else {}
+    if hazir:
+        print(f"--devam: {sum(s['soru'] in hazir for s in sorular)} soru önceki çalıştırmadan alındı.")
     kayitlar = []
     for i, ornek in enumerate(sorular, 1):
+        if ornek["soru"] in hazir:
+            kayitlar.append(hazir[ornek["soru"]])
+            continue
         k = degerlendir_bir(ornek, a.model)
         kayitlar.append(k)
         print(f"[{i}/{len(sorular)}] {'✓' if k['esnek'] else '✗'} {k['durum']:17s} {ornek['soru']}", flush=True)
         if len(kayitlar) >= 2 and all("429" in k.get("hata", "") for k in kayitlar[-2:]):
-            print("Kota doldu (art arda 429). Durduruluyor; kota yenilenince tekrar çalıştır.")
+            print("Kota doldu (art arda 429). Durduruluyor; kota yenilenince --devam ile sürdür.")
+            # Sorulmayan sorular da API hatası sayılır ki rapor ölçümün eksik olduğunu göstersin
+            kayitlar += [hazir.get(s["soru"]) or {
+                "soru": s["soru"], "etiket": s["etiket"], "altin_sql": s["sql"],
+                "durum": "api_hatasi", "hata": "sorulmadı (kota)", "kati": False, "esnek": False}
+                for s in sorular[i:]]
             break
         if a.bekle and i < len(sorular):
             time.sleep(a.bekle)
 
-    (SONUC_KLASORU / f"text2sql_{a.model}.jsonl").write_text(
+    jsonl.write_text(
         "\n".join(json.dumps(k, ensure_ascii=False) for k in kayitlar) + "\n", encoding="utf-8")
     print(f"Rapor -> {rapor_yaz(kayitlar, a.model)}")
 
