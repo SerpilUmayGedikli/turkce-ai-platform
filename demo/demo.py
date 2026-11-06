@@ -60,14 +60,21 @@ def arayuz() -> gr.Blocks:
             with gr.Row():
                 with gr.Column(scale=3):
                     sohbet_kutusu = gr.Chatbot(type="messages", height=440, label="Sohbet")
-                    soru = gr.Textbox(placeholder="Sorunu yaz ve Enter'a bas…", show_label=False,
-                                      max_length=servis.MAKS_SORU)
-                    gr.Examples(ORNEK_SORULAR, soru, label="Örnek sorular")
+                    with gr.Row():
+                        soru = gr.Textbox(placeholder="Sorunu yaz ve Enter'a bas…", show_label=False,
+                                          max_length=servis.MAKS_SORU, scale=5)
+                        gonder = gr.Button("Gönder", variant="primary", scale=1)
+                    ornek_sorular = ornek_listesi(soru, ORNEK_SORULAR, "Örnek sorular (tıkla, cevaplasın)")
                     temizle = gr.Button("Sohbeti temizle", size="sm")
                 with gr.Column(scale=2):
                     iz = gr.Markdown("_Bir soru sor: modele giden metin, araç çağrıları ve SQL burada görünür._",
                                      label="Arka planda")
-            soru.submit(sohbet, [soru, sohbet_kutusu], [sohbet_kutusu, soru, iz], concurrency_limit=2)
+            cikti = [sohbet_kutusu, soru, iz]
+            for olay in (soru.submit, gonder.click):
+                olay(sohbet, [soru, sohbet_kutusu], cikti, concurrency_limit=2)
+            # Örneğe tıklamak soruyu sadece kutuya yazmakla kalmaz, doğrudan gönderir
+            ornek_sorular.click(lambda ornek, gecmis: sohbet(ornek[0], gecmis), [ornek_sorular, sohbet_kutusu],
+                                cikti, concurrency_limit=2)
             temizle.click(lambda: ([], ""), None, [sohbet_kutusu, iz])
 
         with gr.Tab("🛡️ KVKK Kalkanı"):
@@ -89,13 +96,15 @@ def arayuz() -> gr.Blocks:
             with gr.Row():
                 belge_sorgu = gr.Textbox(ORNEK_BELGE[0], label="Soru", scale=4)
                 yontem = gr.Dropdown(servis_yontemleri(), value="hibrit-on5", label="Yöntem", scale=1)
-            gr.Examples(ORNEK_BELGE, belge_sorgu, label="Örnekler")
+            belge_ornekleri = ornek_listesi(belge_sorgu, ORNEK_BELGE, "Örnekler (tıkla, arasın)")
             belge_dugme = gr.Button("Ara", variant="primary")
             belge_sonuc = gr.Markdown()
             karsilastirma = gr.Dataframe(headers=["Yöntem", "1.", "2.", "3."], label="Yöntemler ne buldu?",
                                          interactive=False, wrap=True)
             for olay in (belge_dugme.click, belge_sorgu.submit):
                 olay(servis.belge_ara, [belge_sorgu, yontem], [belge_sonuc, karsilastirma])
+            belge_ornekleri.click(lambda ornek, y: (ornek[0], *servis.belge_ara(ornek[0], y)),
+                                  [belge_ornekleri, yontem], [belge_sorgu, belge_sonuc, karsilastirma])
 
         with gr.Tab("🗄️ Güvenli SQL"):
             gr.Markdown("Modelin yazdığı SQL'e güvenilmez: salt okunur bağlantı, yalnızca SELECT'e izin veren "
@@ -103,19 +112,26 @@ def arayuz() -> gr.Blocks:
                         "Türkçe ayrıntı: SQLite'ın `LIKE`'ı `Ş` harfini tanımaz, `tr_lower()` tanır.")
             sql = gr.Code("SELECT COUNT(*) FROM musteriler WHERE tr_lower(ad) LIKE 'ş%'", language="sql",
                           label="SQL")
-            gr.Examples(ORNEK_SQL, sql, label="Örnekler")
+            sql_ornekleri = ornek_listesi(sql, ORNEK_SQL, "Örnekler (tıkla, çalışsın)")
             sql_dugme = gr.Button("Çalıştır", variant="primary")
             sql_durum = gr.Markdown()
             sql_tablo = gr.Dataframe(interactive=False, label="Sonuç")
-
-            def sql_goster(s):
-                sutunlar, satirlar, durum = servis.sql_calistir(s)
-                if not sutunlar:  # reddedildi: eski sonuç ekranda kalmasın
-                    return gr.update(value=None), durum
-                return gr.update(value=satirlar, headers=sutunlar), durum
-
             sql_dugme.click(sql_goster, sql, [sql_tablo, sql_durum])
+            sql_ornekleri.click(lambda ornek: (ornek[0], *sql_goster(ornek[0])), sql_ornekleri,
+                                [sql, sql_tablo, sql_durum])
     return d
+
+
+def ornek_listesi(bilesen, ornekler: list[str], baslik: str) -> gr.Dataset:
+    """gr.Examples tıklanınca sadece kutuyu doldurur; Dataset'in click olayına işlevi bağlarız."""
+    return gr.Dataset(components=[bilesen], samples=[[o] for o in ornekler], label=baslik)
+
+
+def sql_goster(s):
+    sutunlar, satirlar, durum = servis.sql_calistir(s)
+    if not sutunlar:  # reddedildi: eski sonuç ekranda kalmasın
+        return gr.update(value=None), durum
+    return gr.update(value=satirlar, headers=sutunlar), durum
 
 
 def servis_yontemleri() -> list[str]:

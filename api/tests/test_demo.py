@@ -85,6 +85,19 @@ def test_belge_arama_sekmesi(monkeypatch):
     assert "Embedding" in servis.belge_ara("kapıda ödeme", "hibrit-on5")[0]
 
 
+def test_ornekler_tiklaninca_calisir():
+    """Örnek listeleri sadece kutuyu doldurmamalı: her birinin click olayına bir işlev bağlı olmalı."""
+    gr = pytest.importorskip("gradio")
+    import demo
+
+    d = demo.arayuz()
+    listeler = [b for b in d.blocks.values() if isinstance(b, gr.Dataset)]
+    assert len(listeler) == 3
+    tetikleyiciler = {tuple(hedef) for dep in d.config["dependencies"] for hedef in dep["targets"]}
+    for liste in listeler:
+        assert (liste._id, "click") in tetikleyiciler
+
+
 def test_space_paketi_gizli_dosya_icermez(tmp_path):
     pytest.importorskip("gradio")
     sys.path.insert(0, str(Path(servis.__file__).parent))
