@@ -1,0 +1,58 @@
+# LiteLLM Gateway ayarları
+# Uygulama model adını değil, "takma adı" (hizli, akilli, yerel...) kullanır.
+# Böylece sağlayıcı değiştirmek için kod değil, sadece bu dosya değişir.
+#
+# NOT: Ücretsiz model adları sık değişir. Kullanmadan önce kontrol et:
+#   - OpenRouter ücretsiz modeller: https://openrouter.ai/models?max_price=0
+#   - Groq modelleri:              https://console.groq.com/docs/models
+#   - Gemini modelleri:            https://ai.google.dev/gemini-api/docs/models
+
+model_list:
+  # Çok hızlı, ücretsiz kotası cömert -> basit sorular
+  - model_name: hizli
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  # Güçlü ve ücretsiz, araç çağırmada (tool calling) iyi -> agent'ın varsayılanı
+  - model_name: gemini
+    litellm_params:
+      model: gemini/gemini-3.8-flash  # 2.5-flash yeni kullanıcılara kapandı (Kasım 2026)
+      api_key: os.environ/GEMINI_API_KEY
+
+  # Aynı anahtarla bir önceki nesil: ana model yoğunken (503) devreye girer
+  - model_name: gemini-yedek
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # Qwen (OpenRouter üzerinden, ":free" sonekli modeller ücretsiz)
+  - model_name: qwen
+    litellm_params:
+      model: openrouter/qwen/qwen3-235b-a22b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Kimi (Moonshot) - OpenRouter üzerinden
+  - model_name: kimi
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k2:free
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Yerel model: önce indir ->  docker compose exec ollama ollama pull qwen2.5:7b
+  - model_name: yerel
+    litellm_params:
+      model: ollama_chat/qwen2.5:7b
+      api_base: os.environ/OLLAMA_API_BASE  # Docker: http://ollama:11434, yerel: http://localhost:11434
+
+litellm_settings:
+  # Bir model hata verir ya da kota dolarsa sıradakine geç
+  fallbacks:
+    - gemini: ["gemini-yedek", "hizli", "qwen", "yerel"]
+    - qwen: ["kimi", "gemini", "gemini-yedek", "yerel"]
+    - kimi: ["qwen", "gemini", "gemini-yedek", "yerel"]
+    - hizli: ["gemini", "gemini-yedek", "yerel"]
+  num_retries: 1
+  request_timeout: 120
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
