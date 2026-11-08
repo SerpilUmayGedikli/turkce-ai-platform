@@ -244,6 +244,26 @@ CV (PDF/DOCX/TXT) + ilan
   ayarlanmadı. Skor bir karar değil, yön göstergesidir. Ad tespiti CV'nin ilk satırına dayanır
   (gerekirse arayüzden girilir). Sözlükte olmayan beceriler yalnızca embedding ile yakalanır.
 
+### Masaüstü uygulaması ve site
+
+Aynı arayüz (`uygulama/web/`, HTML/CSS/JS, derleme adımı yok) iki şekilde çalışır. Arka uç her iki
+durumda da aynı FastAPI uç noktalarıdır (`app/cv/web_api.py`, `/api/docs`).
+
+| | Nasıl | Ne olur |
+|---|---|---|
+| **Site** | `python uygulama/sunucu.py` | http://localhost:8100 adresini tarayıcıda açar |
+| **Masaüstü** | `python uygulama/masaustu.py` | Sunucu arka planda başlar, arayüz kendi penceresinde (WebView2) açılır |
+| **.exe** | `powershell -ExecutionPolicy Bypass -File .\uygulama\paketle.ps1` | `dist\CV Uyarlayici\CV Uyarlayici.exe` (Python gerekmez) |
+
+Ekranlar: **CV ve ilan** (dosya bırak / yapıştır) → **Eşleşme** (her gereksinim fosforlu kalemle:
+karşılanıyor / kısmen / eksik, CV'deki en yakın cümle, beceri grupları; uyarlamadan sonra önce/sonra
+karşılaştırması) → **Uyarlanmış CV** (kâğıt önizleme, şüpheli ifadeler pembe, Word/PDF indirme).
+**Ayarlar**'da Gemini anahtarı ya da gateway adresi girilir; `%APPDATA%\CVUyarlayici\ayarlar.json`
+dosyasında yalnızca bu bilgisayarda saklanır, API anahtarı geri döndürmez. `.env`'de gateway adresi olup
+gateway kapalıysa sistem doğrudan Gemini'ye geçer.
+
+Eski Gradio arayüzü ve komut satırı da çalışmaya devam eder:
+
 ```bash
 python demo/cv_demo.py                                   # http://localhost:7861
 cd api && python -m app.cv app/cv/ornekler/ornek_cv.txt app/cv/ornekler/ornek_ilan.txt --cikti ciktilar

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CV Uyarlayıcı</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='6' y='3' width='20' height='26' rx='2' fill='%23fff' stroke='%231B2440' stroke-width='2'/><rect x='10' y='10' width='12' height='3' fill='%23C9F0D8'/><rect x='10' y='16' width='9' height='3' fill='%23FFE9A8'/><rect x='10' y='22' width='11' height='3' fill='%23FAD4D8'/></svg>">
+</head>
+<body>
+<div class="pencere">
+  <nav class="kenar" aria-label="Adımlar">
+    <div class="marka">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="3" width="20" height="26" rx="2" class="m-kagit"/><rect x="10" y="10" width="12" height="3" class="m-yesil"/><rect x="10" y="16" width="9" height="3" class="m-sari"/><rect x="10" y="22" width="11" height="3" class="m-pembe"/></svg>
+      <span>CV Uyarlayıcı</span>
+    </div>
+    <ol class="adimlar">
+      <li><button data-ekran="girdiler" class="adim aktif"><span class="no">1</span><span class="ad">CV ve ilan</span></button></li>
+      <li><button data-ekran="eslesme" class="adim" disabled><span class="no">2</span><span class="ad">Eşleşme</span></button></li>
+      <li><button data-ekran="sonuc" class="adim" disabled><span class="no">3</span><span class="ad">Uyarlanmış CV</span></button></li>
+    </ol>
+    <button data-ekran="ayarlar" class="adim ayar"><span class="no" aria-hidden="true">
+      <svg viewBox="0 0 20 20"><path d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm7 4.6v-2.2l-2-.4a5.4 5.4 0 0 0-.6-1.4l1.2-1.7-1.6-1.6-1.7 1.2c-.4-.3-.9-.5-1.4-.6L10.6 2H8.4L8 4.4c-.5.1-1 .3-1.4.6L4.9 3.8 3.3 5.4l1.2 1.7c-.3.4-.5.9-.6 1.4L1.5 8.9v2.2l2.4.4c.1.5.3 1 .6 1.4l-1.2 1.7 1.6 1.6 1.7-1.2c.4.3.9.5 1.4.6l.4 2.4h2.2l.4-2.4c.5-.1 1-.3 1.4-.6l1.7 1.2 1.6-1.6-1.2-1.7c.3-.4.5-.9.6-1.4l2.4-.4Z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+    </span><span class="ad">Ayarlar</span></button>
+    <div class="durum" id="durum" role="status">
+      <span class="nokta"></span><span id="durum-metin">Bağlanıyor…</span>
+    </div>
+  </nav>
+
+  <main class="calisma">
+    <header class="arac">
+      <h1 id="baslik">CV ve ilan</h1>
+      <div class="olcer" id="olcer" hidden>
+        <span class="olcer-etiket">Uyum</span>
+        <div class="olcer-cubuk"><div class="olcer-once" id="olcer-once"></div><div class="olcer-sonra" id="olcer-sonra"></div></div>
+        <span class="olcer-sayi" id="olcer-sayi"></span>
+      </div>
+    </header>
+
+    <!-- 1. Girdiler -->
+    <section class="ekran" id="ekran-girdiler">
+      <div class="uyari-serit" id="model-uyari" role="alert" hidden>
+        <div>
+          <strong>Model bağlı değil.</strong>
+          Uyumu ölçebilirsin ama CV'yi yeniden yazmak için bir Gemini API anahtarı gerekiyor.
+        </div>
+        <button class="ikincil" id="ayara-git" type="button">Ayarlar'a git</button>
+      </div>
+      <div class="iki-sutun">
+        <div class="kart">
+          <div class="kart-bas"><h2>CV'n</h2><span class="ipucu">PDF, DOCX ya da TXT</span></div>
+          <label class="birak" id="birak" tabindex="0">
+            <input type="file" id="dosya" accept=".pdf,.docx,.txt,.md" hidden>
+            <span id="birak-metin"><strong>Dosyayı buraya bırak</strong> ya da seçmek için tıkla</span>
+          </label>
+          <textarea id="cv" spellcheck="false" placeholder="…ya da CV metnini buraya yapıştır"></textarea>
+          <label class="alan"><span>Ad Soyad</span>
+            <input id="ad" placeholder="Boş bırakırsan CV'nin ilk satırı kullanılır" autocomplete="name">
+          </label>
+        </div>
+        <div class="kart">
+          <div class="kart-bas"><h2>İş ilanı</h2><button class="baglanti" id="ornek">Örnek CV ve ilanla dene</button></div>
+          <textarea id="ilan" class="uzun" spellcheck="false" placeholder="İlan metnini olduğu gibi yapıştır: görev tanımı, aranan nitelikler, tercih sebepleri…"></textarea>
+          <label class="alan"><span>CV dili</span>
+            <select id="dil"><option value="ilan">İlanla aynı dil</option><option value="tr">Türkçe</option><option value="en">İngilizce</option></select>
+          </label>
+        </div>
+      </div>
+      <div class="eylemler">
+        <p class="not">Ad ve iletişim bilgilerin modele gönderilmez. Uyum ölçümü bilgisayarında yapılır.</p>
+        <button class="ikincil" id="olc">Uyumu ölç</button>
+        <button class="birincil" id="uyarla">CV'yi uyarla</button>
+      </div>
+    </section>
+
+    <!-- 2. Eşleşme -->
+    <section class="ekran" id="ekran-eslesme" hidden>
+      <div class="sekme-cubugu" id="once-sonra" hidden role="tablist">
+        <button role="tab" data-gorunum="once">Orijinal CV</button>
+        <button role="tab" data-gorunum="sonra" aria-selected="true">Uyarlanmış CV</button>
+      </div>
+      <div class="eslesme">
+        <div class="kart gereksinim-karti">
+          <div class="kart-bas"><h2>İlanın istedikleri</h2>
+            <div class="lejant"><span class="isaret yesil">karşılanıyor</span><span class="isaret sari">kısmen</span><span class="isaret pembe">eksik</span></div>
+          </div>
+          <ul class="gereksinimler" id="gereksinimler"></ul>
+          <p class="not" id="yontem"></p>
+        </div>
+        <aside class="kart beceri-karti">
+          <h2>Beceriler</h2>
+          <div class="beceri-grup"><h3>CV'nde var</h3><div class="etiketler" id="b-eslesen"></div></div>
+          <div class="beceri-grup"><h3>Dolaylı var, adıyla yazılmalı</h3><p class="aciklama">Örneğin scikit-learn kullanmışsan "makine öğrenmesi" yazabilirsin.</p><div class="etiketler" id="b-dolayli"></div></div>
+          <div class="beceri-grup"><h3>CV'nde yok</h3><p class="aciklama">Uyarlarken eklenmez, öneri olarak sunulur.</p><div class="etiketler" id="b-eksik"></div></div>
+        </aside>
+      </div>
+      <div class="eylemler" id="eslesme-eylem">
+        <button class="ikincil" data-git="girdiler">Girdileri düzenle</button>
+        <button class="birincil" id="uyarla2">CV'yi uyarla</button>
+      </div>
+    </section>
+
+    <!-- 3. Sonuç -->
+    <section class="ekran" id="ekran-sonuc" hidden>
+      <div class="sonuc">
+        <div class="masa"><article class="kagit" id="kagit"></article></div>
+        <aside class="denetci">
+          <div class="indir">
+            <button class="birincil" data-bicim="docx">Word olarak indir</button>
+            <button class="ikincil" data-bicim="pdf">PDF olarak indir</button>
+          </div>
+          <div class="kutu uyari" id="kutu-uyari" hidden>
+            <h3>Göndermeden önce kontrol et</h3>
+            <p>Bunlar orijinal CV'nde geçmiyor. Model eklemiş olabilir; doğru değilse sil.</p>
+            <ul id="uyarilar"></ul>
+          </div>
+          <div class="kutu"><h3>Ne değişti</h3><ul id="degisiklikler"></ul></div>
+          <div class="kutu"><h3>Eksikler için öneriler</h3><ul id="oneriler"></ul></div>
+          <p class="not" id="model-notu"></p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Ayarlar -->
+    <section class="ekran" id="ekran-ayarlar" hidden>
+      <form class="kart ayarlar" id="ayar-formu">
+        <h2>Model bağlantısı</h2>
+        <p class="aciklama">CV'yi yeniden yazmak için bir dil modeli gerekir. İkisinden birini doldurman yeterli.
+          Ayarlar yalnızca bu bilgisayarda saklanır.</p>
+        <label class="alan"><span>Gemini API anahtarı</span>
+          <input id="ayar-anahtar" type="password" autocomplete="off" placeholder="Değiştirmek için yeni anahtarı yaz">
+          <small>Ücretsiz anahtar: aistudio.google.com/apikey <span id="anahtar-durum"></span></small>
+        </label>
+        <label class="alan"><span>Gateway adresi (isteğe bağlı)</span>
+          <input id="ayar-url" placeholder="http://localhost:4000">
+          <small>Doluysa Gemini anahtarı yerine projenin LiteLLM gateway'i kullanılır.</small>
+        </label>
+        <p class="not" id="ayar-disaridan" hidden></p>
+        <div class="eylemler sol">
+          <button class="birincil" type="submit">Ayarları kaydet</button>
+          <span class="not" id="ayar-sonuc" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <div class="perde" id="perde" hidden>
+      <div class="perde-kutu" role="alert" aria-live="assertive">
+        <div class="yaziyor"><span></span><span></span><span></span></div>
+        <p id="perde-metin">Model CV'yi yeniden yazıyor</p>
+        <small>Genelde 15–40 saniye sürer.</small>
+      </div>
+    </div>
+    <div class="bildirim" id="bildirim" role="alert" hidden></div>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

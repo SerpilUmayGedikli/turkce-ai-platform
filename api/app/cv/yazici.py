@@ -84,10 +84,26 @@ class UyarlanmisCV:
         return "\n".join(s for s in satirlar if s)
 
 
+def _ulasilabilir(url: str, zaman_asimi: float = 0.4) -> bool:
+    """Gateway adresine TCP bağlantısı kurulabiliyor mu? (kapalı gateway'de 2 dk beklememek için)"""
+    import socket  # noqa: PLC0415
+    from urllib.parse import urlparse  # noqa: PLC0415
+
+    u = urlparse(url)
+    try:
+        with socket.create_connection((u.hostname or "localhost",
+                                       u.port or (443 if u.scheme == "https" else 80)), zaman_asimi):
+            return True
+    except OSError:
+        return False
+
+
 def baglanti() -> tuple[OpenAI | None, list[str]]:
-    """Gateway (LLM_BASE_URL) varsa onu, yoksa GEMINI_API_KEY ile doğrudan Gemini'yi kullanır."""
-    if os.getenv("LLM_BASE_URL"):
-        istemci = OpenAI(base_url=os.environ["LLM_BASE_URL"],
+    """Gateway (LLM_BASE_URL) açıksa onu, değilse GEMINI_API_KEY ile doğrudan Gemini'yi kullanır.
+    .env'de gateway adresi olup gateway kapalıysa sessizce Gemini'ye düşer."""
+    url = os.getenv("LLM_BASE_URL")
+    if url and (_ulasilabilir(url) or not os.getenv("GEMINI_API_KEY")):
+        istemci = OpenAI(base_url=url,
                          api_key=os.getenv("LITELLM_MASTER_KEY", "sk-degistir-beni"))
         return istemci, [os.getenv("CV_MODEL", os.getenv("AGENT_MODEL", "gemini"))]
     if os.getenv("GEMINI_API_KEY"):

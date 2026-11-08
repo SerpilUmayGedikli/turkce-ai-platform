@@ -7,3 +7,6 @@ venv/
 api/data/*.db
 api/data/rag_onbellek/
 demo/space/
+dist/
+build/
+*.spec

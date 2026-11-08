@@ -112,7 +112,10 @@ def _anlam_olcekle(benzerlik: np.ndarray) -> np.ndarray:
 
 def analiz_et(cv: str, ilan: str, gomucu: Gomucu | None = None) -> Analiz:
     gereksinimler = gereksinimleri_ayir(ilan)
-    cv_cumleleri = _cumleler(cv, min_kelime=2) or [cv]
+    from .okuyucu import baslik_cikar  # noqa: PLC0415
+
+    ad = baslik_cikar(cv).ad  # ad satırı bir "deneyim cümlesi" değil, eşleşmeye girmesin
+    cv_cumleleri = [c for c in _cumleler(cv, min_kelime=2) if c != ad] or [cv]
     cv_terimleri = _terimler(cv)
     cv_beceri = beceriler.bul(cv)
     cv_genis = beceriler.genislet(cv_beceri)
