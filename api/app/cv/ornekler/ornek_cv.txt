@@ -1,0 +1,27 @@
+Elif Kaya
+elif.kaya@ornek.com | 0532 111 22 33 | linkedin.com/in/elifkaya-ornek
+
+ÖZET
+Endüstri mühendisi. Veri analizi ve raporlama alanında 3 yıllık deneyim. Üretim verisinden içgörü çıkarmayı seviyorum.
+
+DENEYİM
+Veri Analisti - Anadolu Tekstil A.Ş. (2023 - Günümüz)
+- Python ve Pandas ile günlük üretim verilerini temizleyip haftalık raporlar hazırladım.
+- Power BI ile yönetim için 12 panelli bir üretim panosu kurdum, raporlama süresini %40 kısalttım.
+- Makine arızalarını tahmin etmek için scikit-learn ile bir sınıflandırma modeli geliştirdim.
+- SQL ile ERP veritabanından veri çektim, karmaşık sorgular yazdım.
+
+Stajyer Mühendis - Ege Otomotiv (2022 - 2023)
+- Excel ile stok verilerini analiz ettim.
+- Kalite ekibiyle birlikte hata kayıtlarını sınıflandırdım.
+- Fabrika ziyaretçilerine tur rehberliği yaptım.
+
+EĞİTİM
+Dokuz Eylül Üniversitesi, Endüstri Mühendisliği, 2018 - 2022, GPA 3.21
+
+BECERİLER
+Python, Pandas, SQL, Power BI, Excel, scikit-learn, istatistik, Git, İngilizce (B2)
+
+PROJELER
+- Türkçe müşteri yorumlarında duygu analizi (kişisel proje, Hugging Face transformers)
+- Kaggle veri yarışmalarına katılım

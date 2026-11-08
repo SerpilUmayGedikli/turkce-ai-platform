@@ -1,0 +1,16 @@
+Junior Makine Öğrenmesi Mühendisi
+
+Ekibimize üretim süreçlerini yapay zeka ile iyileştirecek bir makine öğrenmesi mühendisi arıyoruz.
+
+Aranan Nitelikler:
+- Python ile en az 2 yıl deneyim
+- Makine öğrenmesi modelleri geliştirme ve değerlendirme tecrübesi (scikit-learn, PyTorch)
+- SQL ile veri sorgulama ve veri temizleme becerisi
+- Veri görselleştirme ve sonuçları teknik olmayan paydaşlara anlatabilme
+- Git ile versiyon kontrolü
+- İyi derecede İngilizce
+
+Tercihen:
+- Docker ve bulut platformları (AWS veya Azure) deneyimi
+- NLP veya büyük dil modelleri ile proje deneyimi
+- Üretim / imalat sektörü tecrübesi

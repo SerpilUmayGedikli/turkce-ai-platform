@@ -222,6 +222,33 @@ python demo/demo.py        # http://localhost:7860
 python demo/hazirla.py     # Hugging Face Spaces paketi → demo/space/
 ```
 
+## İlana Göre CV Uyarlayıcı
+
+Her iş ilanı için CV'yi yeniden düzenler. Hibrit bir yapısı var: ölçüm kısmı yerel modelle, yazım kısmı LLM ile yapılır.
+
+```
+CV (PDF/DOCX/TXT) + ilan
+  → 1. Yerel analiz (modelsiz): ilan gereksinim cümlelerine bölünür; her biri CV'deki en yakın
+       cümleyle eşleştirilir (çok dilli embedding + Türkçe "ilk 5 harf" kelime örtüşmesi).
+       ~100 becerilik TR/EN sözlük ATS bakışıyla eşleşen / dolaylı / eksik becerileri çıkarır → uyum skoru
+  → 2. KVKK: ad, e-posta, telefon, bağlantılar modele gitmeden etiketlenir
+  → 3. LLM yeniden yazım (gateway): sırala, vurgula, ilanın terimiyle ifade et; UYDURMA YOK
+  → 4. Yerel denetim: CV'de olmayan beceri/sayı/şirket "kontrol et" uyarısı olur
+  → 5. Yeniden skorlama (önce → sonra) + ATS dostu DOCX ve PDF
+```
+
+- **Dolaylı beceri:** CV'de "makine öğrenmesi" yazmıyor ama scikit-learn ile model geliştirilmişse,
+  model ilanın terimini açıkça yazabilir. Bu uydurma sayılmaz. PyTorch gibi gerçekten olmayan bir beceri
+  ise CV'ye girmez, yalnızca öneri olarak sunulur.
+- **Bilinen sınırlar:** Eşikler (0.55 / 0.35) ve skor ağırlıkları elle seçildi, etiketli veriyle
+  ayarlanmadı. Skor bir karar değil, yön göstergesidir. Ad tespiti CV'nin ilk satırına dayanır
+  (gerekirse arayüzden girilir). Sözlükte olmayan beceriler yalnızca embedding ile yakalanır.
+
+```bash
+python demo/cv_demo.py                                   # http://localhost:7861
+cd api && python -m app.cv app/cv/ornekler/ornek_cv.txt app/cv/ornekler/ornek_ilan.txt --cikti ciktilar
+```
+
 ## Yol haritası
 
 - [x] **Hafta 1–2:** Gateway, sıfırdan agent döngüsü, araç sistemi, testler
@@ -233,6 +260,8 @@ python demo/hazirla.py     # Hugging Face Spaces paketi → demo/space/
 - [x] **Hafta 7–8:** Türkçe hibrit arama (kök/önek + BM25 + embedding, RRF), 50 soruda Recall@5
 - [ ] **RAG v2:** Ayrı doğrulama seti, gerçek kullanıcı soruları, reranker, cevap doğruluğu (faithfulness)
 - [x] **Canlı demo:** Gradio (SQL + belge + KVKK tek sayfada), Hugging Face Spaces paketi
+- [x] **CV uyarlayıcı v1:** Yerel uyum skoru + KVKK'lı LLM yeniden yazım + uydurma denetimi, DOCX/PDF
+- [ ] **CV v2:** Etiketli ilan-CV çiftleriyle eşik ayarı, sözlük dışı beceri çıkarımı, ön yazı (cover letter)
 - [ ] **Demo yayını:** Space'e yükleme ve linkin README'ye eklenmesi
 - [ ] **Hafta 9–10:** Model router: soruya göre ucuz/güçlü model seçimi, maliyet ve doğruluk raporu
 - [ ] **Hafta 11–12:** Gözlemlenebilirlik (Langfuse), değerlendirme raporu
