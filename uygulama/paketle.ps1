@@ -20,6 +20,7 @@ $py = Join-Path $kok ".venv\Scripts\python.exe"
     --paths "api" `
     --add-data "uygulama\web;web" `
     --add-data "uygulama\simge.ico;." `
+    --add-data "uygulama\ilan_dugmesi.js;." `
     --add-data "api\app\cv\ornekler;app\cv\ornekler" `
     --collect-submodules app `
     --collect-data docx `

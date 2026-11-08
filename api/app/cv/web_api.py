@@ -20,7 +20,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from . import ayarlar, calistir
+from . import ayarlar, calistir, ilanlar
 from .cikti import docx_yaz, pdf_yaz
 from .eslestirme import Analiz, analiz_et, varsayilan_gomucu
 from .okuyucu import Baslik, baslik_cikar, metne_cevir
@@ -166,3 +166,83 @@ def cv_belge(istek: BelgeIstegi, bicim: Literal["docx", "pdf"] = Query("docx")) 
     tur = ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"
            if bicim == "docx" else "application/pdf")
     return Response(veri, media_type=tur)
+
+
+# ---------------------------------------------------------------- ilan siteleri ve kaydedilen ilanlar
+class PlatformIstegi(BaseModel):
+    secili: list[str] | None = None
+    arama: dict[str, str] | None = None
+    ozel_ekle: dict[str, str] | None = None  # {"ad": "...", "adres": "https://..."}
+    ozel_sil: str | None = None
+
+
+class IlanIstegi(BaseModel):
+    metin: str = Field(..., max_length=60_000)
+    baslik: str = ""
+    url: str = ""
+    site: str = ""
+    sirket: str = ""
+
+
+class ListeIstegi(BaseModel):
+    cv: str = Field("", max_length=MAKS_METIN)
+
+
+class DurumIstegi(BaseModel):
+    durum: Literal["yeni", "uyarlandi", "basvuruldu", "gecildi"]
+
+
+@router.get("/platformlar")
+def platform_listesi() -> dict[str, Any]:
+    return ilanlar.platformlar()
+
+
+@router.post("/platformlar")
+def platform_kaydet(istek: PlatformIstegi) -> dict[str, Any]:
+    if istek.ozel_ekle and not re.match(r"^https?://\S+\.\S+", istek.ozel_ekle.get("adres", "").strip()):
+        raise HTTPException(422, "Site adresi http:// ya da https:// ile başlamalı.")
+    return ilanlar.platformlari_kaydet(istek.secili, istek.arama, istek.ozel_ekle, istek.ozel_sil)
+
+
+class ZiyaretIstegi(BaseModel):
+    id: str = Field(..., max_length=60)
+    girdim: bool = True
+
+
+@router.post("/platformlar/ziyaret")
+def platform_ziyaret(istek: ZiyaretIstegi) -> dict[str, Any]:
+    """Günlük tur: "bugün bu siteye girdim" işareti (ertesi gün sıfırlanır)."""
+    return ilanlar.ziyaret_isaretle(istek.id, istek.girdim)
+
+
+@router.post("/ilanlar/liste")
+def ilan_listesi(istek: ListeIstegi) -> dict[str, Any]:
+    return {"ilanlar": ilanlar.sirala(istek.cv, gomucu())}
+
+
+@router.post("/ilanlar")
+def ilan_kaydet(istek: IlanIstegi) -> dict[str, Any]:
+    try:
+        return ilanlar.ilan_ekle(istek.metin, istek.baslik, istek.url, istek.site, istek.sirket)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
+
+@router.get("/ilanlar/{kimlik}")
+def ilan_getir(kimlik: str) -> dict[str, Any]:
+    ilan = ilanlar.ilan_metni(kimlik)
+    if not ilan:
+        raise HTTPException(404, "İlan bulunamadı.")
+    return ilan
+
+
+@router.patch("/ilanlar/{kimlik}")
+def ilan_durum(kimlik: str, istek: DurumIstegi) -> dict[str, str]:
+    ilanlar.ilan_guncelle(kimlik, istek.durum)
+    return {"durum": istek.durum}
+
+
+@router.delete("/ilanlar/{kimlik}")
+def ilan_kaldir(kimlik: str) -> dict[str, bool]:
+    ilanlar.ilan_sil(kimlik)
+    return {"silindi": True}

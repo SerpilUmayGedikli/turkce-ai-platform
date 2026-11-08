@@ -7,7 +7,7 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const MAKS_DENEME = 5;
 // denemeler: her "uyarla" sonucu; sonuc: kullanıcının seçtiği deneme (indirilen o olur)
 const durum = { analiz: null, sonuc: null, gorunum: "sonra", denemeler: [], secili: 0, girdi: null };
-const BASLIKLAR = { girdiler: "CV ve ilan", eslesme: "Eşleşme", sonuc: "Uyarlanmış CV", ayarlar: "Ayarlar" };
+const BASLIKLAR = { girdiler: "CV ve ilan", eslesme: "Eşleşme", sonuc: "Uyarlanmış CV", ilanlar: "İş ilanları", ayarlar: "Ayarlar" };
 
 // ------------------------------------------------------------------ yardımcılar
 function kacis(s) {
@@ -58,6 +58,7 @@ function git(ekran) {
   $$(".adim").forEach((a) => a.classList.toggle("aktif", a.dataset.ekran === ekran));
   $("#baslik").textContent = BASLIKLAR[ekran];
   $(".ekran:not([hidden])").scrollTop = 0;
+  if (ekran === "ilanlar") { platformlariYukle(); ilanlariYukle(); }
 }
 
 function adimlariGuncelle() {
@@ -81,6 +82,7 @@ async function dosyaOku(dosya) {
   try {
     const j = await (await api("/api/cv/oku", { method: "POST", body: form })).json();
     $("#cv").value = j.metin;
+    $("#cv").dispatchEvent(new Event("input")); // hatırlansın (ilan sıralaması için)
     if (j.ad && !$("#ad").value) $("#ad").value = j.ad;
     birak.classList.add("yuklendi");
     $("#birak-metin").textContent = `${dosya.name} okundu. Metni aşağıda düzeltebilirsin.`;

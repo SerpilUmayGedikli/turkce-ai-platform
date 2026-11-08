@@ -263,6 +263,16 @@ karşılaştırması) → **Uyarlanmış CV** (kâğıt önizleme, şüpheli ifa
 dosyasında yalnızca bu bilgisayarda saklanır, API anahtarı geri döndürmez. `.env`'de gateway adresi olup
 gateway kapalıysa sistem doğrudan Gemini'ye geçer.
 
+**İş ilanları** ekranı: Kariyer.net, LinkedIn, Indeed, Yenibiris, Secretcv, Eleman.net, Glassdoor,
+Techcareer, Coderspace, Youthall, Toptalent, Anbean, Kariyer Kapısı, İŞKUR, Jooble, Wellfound, Remote OK
+ve We Work Remotely listelenir; liste dışı site eklenebilir. Tek aramayla seçili siteler açılır.
+Masaüstünde her site kendi penceresinde, kalıcı oturumla açılır: kullanıcı bir kez kendisi giriş yapar,
+uygulama şifre görmez, siteye kendisi giriş yapmaz ve ilan taramaz (bu siteler bunu kullanım koşullarıyla
+yasaklar). Site penceresinin sağ altındaki **＋ CV Uyarlayıcı'ya ekle** düğmesi o anki ilanın metnini
+kaydeder (`%APPDATA%\CVUyarlayici\ilanlar.json`); kaydedilen ilanlar CV'ye uyuma göre yerelde sıralanır,
+eksik anahtar kelimeler gösterilir ve tek tıkla uyarlanır. Site pencerelerinin uygulamadaki tek yetkisi
+`ilan_gonder`'dir (dosya kaydetme, pencere açma yok).
+
 Eski Gradio arayüzü ve komut satırı da çalışmaya devam eder:
 
 ```bash
