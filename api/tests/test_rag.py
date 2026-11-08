@@ -87,6 +87,19 @@ def test_belge_ara_araci_kaynak_doner(monkeypatch):
     assert sonuc.startswith("[Ödeme ve Fatura › Kapıda ödeme]") and "29 TL" in sonuc
 
 
+def test_belge_ara_sonuc_yoksa_acik_mesaj_doner(monkeypatch, tmp_path):
+    monkeypatch.setattr(rag, "varsayilan", lambda: Arama(yukle(tmp_path)))  # belge klasörü boş
+    assert "bulunamadı" in tools.calistir("belge_ara", {"sorgu": "iade"})
+
+
+def test_docker_imaji_belgeleri_icerir():
+    """Docker imajı sadece app/ kopyalarsa belge_ara sessizce boş döner (yaşanmış hata)."""
+    from pathlib import Path
+
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY data/belgeler" in dockerfile
+
+
 def test_olcumler():
     assert sira_bul(["a", "b", "c"], ["c", "x"]) == 3 and sira_bul(["a"], ["z"]) is None
     m = olc([1, 2, None, 6])

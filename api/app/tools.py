@@ -155,7 +155,10 @@ def sql_calistir(sorgu: str) -> str:
 def belge_ara(sorgu: str) -> str:
     from .rag import varsayilan
 
-    return "\n\n".join(f"[{p.belge} › {p.baslik}]\n{p.metin}" for p in varsayilan().ara(sorgu, 3))
+    sonuclar = varsayilan().ara(sorgu, 3)
+    if not sonuclar:  # boş metin dönersek model "bulunamadı" ile "araç bozuk" farkını anlayamaz
+        return "Belgelerde bu konuyla ilgili bölüm bulunamadı. Bilmediğini söyle, tahmin yürütme."
+    return "\n\n".join(f"[{p.belge} › {p.baslik}]\n{p.metin}" for p in sonuclar)
 
 
 def calistir(ad: str, argumanlar: dict[str, Any]) -> str:

@@ -7,33 +7,37 @@ Hedef sohbet botu değil: kurumsal Türkçe kullanım senaryoları için ölçü
 ## Mimari
 
 ```
-            ┌──────────── api (FastAPI) ────────────┐
- kullanıcı ─▶  /sohbet → agent döngüsü → araçlar     │
-            └───────────────┬───────────────────────┘
-                            │ OpenAI uyumlu istek
+            ┌──────────── api (FastAPI) / demo (Gradio) ─────────────┐
+ kullanıcı ─▶  KVKK maskeleme → agent döngüsü → araçlar               │
+            │    sql_calistir ─▶ SQLite (salt okunur, mağaza verisi)  │
+            │    belge_ara    ─▶ hibrit arama (BM25 + embedding,      │
+            │                    bellekte, 9 politika belgesi)        │
+            └───────────────┬────────────────────────────────────────┘
+                            │ OpenAI uyumlu istek (maskeli)
                   ┌─────────▼─────────┐
                   │ LiteLLM Gateway    │  takma adlar + yedekleme (fallback)
-                  └──┬─────┬─────┬────┘
-               Gemini  Groq  OpenRouter (Qwen, Kimi)   Ollama (yerel)
-                            │
-                  ┌─────────▼─────────┐
-                  │ Postgres+pgvector  │  RAG belgeleri, agent kayıtları
-                  └───────────────────┘
+                  └──┬──────┬──────┬──┘
+               Gemini  Alibaba (Qwen, Kimi)  OpenRouter   Ollama (yerel)
 ```
 
 | Bileşen | Açık kaynak proje | Görevi |
 |---|---|---|
-| Gateway | [LiteLLM](https://github.com/BerriAI/litellm) | 100+ sağlayıcıya tek API, fallback, maliyet takibi |
+| Gateway | [LiteLLM](https://github.com/BerriAI/litellm) | Birçok sağlayıcıya tek API, fallback |
 | Yerel model | [Ollama](https://github.com/ollama/ollama) | Veriyi dışarı çıkarmadan model çalıştırma |
-| Veritabanı | [pgvector](https://github.com/pgvector/pgvector) | SQL + vektör araması tek yerde |
+| Embedding | [fastembed](https://github.com/qdrant/fastembed) | CPU'da, PyTorch'suz çok dilli embedding |
+| Arayüz | [Gradio](https://github.com/gradio-app/gradio) | Canlı demo |
 | API | FastAPI | Agent servisi |
+
+> Veri katmanı bilerek basit tutuldu: mağaza verisi SQLite'ta, 47 belge parçasının vektörleri
+> bellekte (numpy). `docker-compose.yml` içindeki Postgres + pgvector henüz kullanılmıyor;
+> belge sayısı büyüyüp kalıcı vektör deposu gerektiğinde devreye girecek.
 
 ## Ücretsiz API anahtarları
 
 | Sağlayıcı | Nereden | Neden |
 |---|---|---|
 | Google Gemini | https://aistudio.google.com/apikey | Cömert ücretsiz kota, araç çağırmada iyi → varsayılan |
-| Groq | https://console.groq.com/keys | Çok hızlı açık modeller (Llama vb.) |
+| Groq | https://console.groq.com/keys | Çok hızlı açık modeller. Gateway'de şu an kapalı: ücretsiz katmandaki modeller değişti, `hizli` takma adı yorum satırında |
 | OpenRouter | https://openrouter.ai/keys | Ücretsiz Nemotron/Gemma; kredi ile Qwen, Kimi (Kasım 2026'da ücretsiz Qwen/Kimi yok) |
 | Alibaba Model Studio | https://modelstudio.console.alibabacloud.com | Qwen + Kimi tek anahtarla, yeni kullanıcıya model başına ~1M token (Singapur) |
 
@@ -45,6 +49,15 @@ Hedef sohbet botu değil: kurumsal Türkçe kullanım senaryoları için ölçü
 > kullanılabilir: gerçek kişisel veri gönderme (bu yüzden KVKK Kalkanı projesi var).
 
 ## Çalıştırma
+
+**Docker olmadan (Windows):** Sanal ortamı kurar, `.env` dosyasını yükler, gateway'i (4000) ve
+API'yi (8000) iki ayrı pencerede açar. Anahtarları `.env` dosyasına `anahtar-ekle.ps1` ile ekle.
+
+```bash
+powershell -ExecutionPolicy Bypass -File .\baslat-yerel.ps1
+```
+
+**Docker ile:**
 
 ```bash
 cp .env.example .env          # anahtarlarını .env içine yaz
@@ -222,7 +235,7 @@ python demo/hazirla.py     # Hugging Face Spaces paketi → demo/space/
 - [x] **Canlı demo:** Gradio (SQL + belge + KVKK tek sayfada), Hugging Face Spaces paketi
 - [ ] **Demo yayını:** Space'e yükleme ve linkin README'ye eklenmesi
 - [ ] **Hafta 9–10:** Model router: soruya göre ucuz/güçlü model seçimi, maliyet ve doğruluk raporu
-- [ ] **Hafta 11–12:** Gözlemlenebilirlik (Langfuse), canlı demo, değerlendirme raporu
+- [ ] **Hafta 11–12:** Gözlemlenebilirlik (Langfuse), değerlendirme raporu
 
 ## Neden agent döngüsü framework'süz?
 

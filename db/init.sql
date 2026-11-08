@@ -1,13 +1,14 @@
 -- Veritabanı ilk açılışta bir kez çalışır.
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- RAG için belge parçaları (3.-4. hafta)
+-- RAG için belge parçaları. Şu an KULLANILMIYOR: arama bellekte (api/app/rag).
+-- Belge sayısı büyüyünce buraya taşınacak. Boyut, kullanılan MiniLM modelinin çıktısı (384).
 CREATE TABLE IF NOT EXISTS belge_parcalari (
     id          BIGSERIAL PRIMARY KEY,
     kaynak      TEXT NOT NULL,
     icerik      TEXT NOT NULL,
     metadata    JSONB DEFAULT '{}'::jsonb,
-    embedding   vector(768),
+    embedding   vector(384),
     olusturulma TIMESTAMPTZ DEFAULT now()
 );
 

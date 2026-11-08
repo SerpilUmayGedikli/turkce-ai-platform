@@ -29,7 +29,7 @@ services:
       - "11434:11434"
     restart: unless-stopped
 
-  # 3) Veritabanı + vektör araması (RAG ve Text-to-SQL için)
+  # 3) Veritabanı + vektör araması: henüz kullanılmıyor (Text-to-SQL SQLite, RAG bellekte)
   postgres:
     image: pgvector/pgvector:pg16
     environment:

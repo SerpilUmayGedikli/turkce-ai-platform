@@ -29,7 +29,7 @@ class Mesaj(BaseModel):
 
 class SohbetIstegi(BaseModel):
     mesaj: str = Field(..., min_length=1, examples=["250 * 1.2 kaç eder?"])
-    model: str | None = Field(None, description="gateway takma adı: gemini, qwen, kimi, hizli, yerel")
+    model: str | None = Field(None, description="gateway takma adı: gemini, gemini-3, gemini-lite, qwen, kimi, nemotron, yerel")
     gecmis: list[Mesaj] = []
     kvkk: bool = Field(True, description="Kişisel verileri modele göndermeden önce maskele")
 
