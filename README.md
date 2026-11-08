@@ -254,6 +254,7 @@ durumda da aynı FastAPI uç noktalarıdır (`app/cv/web_api.py`, `/api/docs`).
 | **Site** | `python uygulama/sunucu.py` | http://localhost:8100 adresini tarayıcıda açar |
 | **Masaüstü** | `python uygulama/masaustu.py` | Sunucu arka planda başlar, arayüz kendi penceresinde (WebView2) açılır |
 | **.exe** | `powershell -ExecutionPolicy Bypass -File .\uygulama\paketle.ps1` | `dist\CV Uyarlayici\CV Uyarlayici.exe` (Python gerekmez) |
+| **Kurulum** | `powershell -ExecutionPolicy Bypass -File .\uygulama\kur.ps1` | `%LOCALAPPDATA%\Programs\CV Uyarlayici` altına kurar, Masaüstü'ne ve Başlat menüsüne simgeli kısayol koyar (`-Kaldir` ile kaldırır) |
 
 Ekranlar: **CV ve ilan** (dosya bırak / yapıştır) → **Eşleşme** (her gereksinim fosforlu kalemle:
 karşılanıyor / kısmen / eksik, CV'deki en yakın cümle, beceri grupları; uyarlamadan sonra önce/sonra

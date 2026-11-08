@@ -24,7 +24,7 @@ from . import ayarlar, calistir
 from .cikti import docx_yaz, pdf_yaz
 from .eslestirme import Analiz, analiz_et, varsayilan_gomucu
 from .okuyucu import Baslik, baslik_cikar, metne_cevir
-from .yazici import UyarlanmisCV, baglanti
+from .yazici import GEMINI_SECENEKLERI, GEMINI_VARSAYILAN, UyarlanmisCV, baglanti
 
 router = APIRouter(prefix="/api")
 MAKS_DOSYA = 10 * 1024 * 1024
@@ -54,6 +54,8 @@ def analiz_json(a: Analiz) -> dict[str, Any]:
         "dolayli": sorted(a.ima_edilen_beceriler),
         "eksik": sorted(a.eksik_beceriler),
         "gereksinimler": [asdict(g) for g in a.gereksinimler],
+        "anahtarlar": [asdict(k) for k in a.anahtarlar],
+        "ats": a.ats_kapsama,
     }
 
 
@@ -65,6 +67,9 @@ class AnalizIstegi(BaseModel):
 class UyarlaIstegi(AnalizIstegi):
     ad: str = ""
     dil: Literal["ilan", "tr", "en"] = "ilan"
+    mod: Literal["hedef", "temkinli"] = "hedef"
+    onceki: dict[str, Any] | None = None  # "bir daha uyarla": önceki skor, zayıflar, projeler
+    ek: str = Field("", max_length=MAKS_METIN)  # GitHub'da olmayan projeler, bilinen beceriler
 
 
 class BelgeIstegi(BaseModel):
@@ -75,6 +80,7 @@ class BelgeIstegi(BaseModel):
 class AyarIstegi(BaseModel):
     llm_base_url: str | None = None
     gemini_api_key: str | None = None
+    gemini_model: str | None = None
 
 
 @router.get("/durum")
@@ -84,6 +90,8 @@ def durum() -> dict[str, Any]:
         "model": modeller[0] if client else None,
         "embedding": "hazir" if _gomucu.get("g") else ("yukleniyor" if "g" not in _gomucu else "yok"),
         **ayarlar.ozet(),
+        "gemini_secenekleri": GEMINI_SECENEKLERI,
+        "gemini_varsayilan": GEMINI_VARSAYILAN,
     }
 
 
@@ -106,7 +114,10 @@ def ayarlari_getir() -> dict[str, Any]:
 def ayarlari_kaydet(istek: AyarIstegi) -> dict[str, Any]:
     if istek.llm_base_url and not re.match(r"^https?://", istek.llm_base_url.strip()):
         raise HTTPException(422, "Gateway adresi http:// ya da https:// ile başlamalı.")
-    ayarlar.kaydet({"LLM_BASE_URL": istek.llm_base_url, "GEMINI_API_KEY": istek.gemini_api_key})
+    if istek.gemini_model and istek.gemini_model not in {s["id"] for s in GEMINI_SECENEKLERI}:
+        raise HTTPException(422, "Bilinmeyen model.")
+    ayarlar.kaydet({"LLM_BASE_URL": istek.llm_base_url, "GEMINI_API_KEY": istek.gemini_api_key,
+                    "GEMINI_MODEL": istek.gemini_model})
     return durum()
 
 
@@ -135,7 +146,8 @@ def cv_analiz(istek: AnalizIstegi) -> dict[str, Any]:
 @router.post("/cv/uyarla")
 def cv_uyarla(istek: UyarlaIstegi) -> dict[str, Any]:
     try:
-        s = calistir(istek.cv, istek.ilan, ad=istek.ad.strip(), dil=istek.dil, gomucu=gomucu())
+        s = calistir(istek.cv, istek.ilan, ad=istek.ad.strip(), dil=istek.dil, gomucu=gomucu(),
+                     mod=istek.mod, onceki=istek.onceki, ek=istek.ek)
     except RuntimeError as e:
         raise HTTPException(503, str(e)) from e
     return {"baslik": asdict(s.baslik), "once": analiz_json(s.once),

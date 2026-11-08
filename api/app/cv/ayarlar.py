@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-ALANLAR = ("LLM_BASE_URL", "LITELLM_MASTER_KEY", "GEMINI_API_KEY", "CV_MODEL")
+ALANLAR = ("LLM_BASE_URL", "LITELLM_MASTER_KEY", "GEMINI_API_KEY", "GEMINI_MODEL", "CV_MODEL")
 
 
 def klasor() -> Path:
@@ -74,5 +74,6 @@ def ozet() -> dict[str, object]:
         "baglanti": "gateway" if url else ("gemini" if os.getenv("GEMINI_API_KEY") else "yok"),
         "llm_base_url": url,
         "gemini_anahtari_var": bool(os.getenv("GEMINI_API_KEY")),
+        "gemini_model": os.getenv("GEMINI_MODEL", ""),
         "disaridan": sorted(_DISARIDAN),  # .env/ortamdan gelenler arayüzden değiştirilemez
     }

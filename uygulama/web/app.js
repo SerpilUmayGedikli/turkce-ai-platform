@@ -4,7 +4,9 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-const durum = { analiz: null, sonuc: null, gorunum: "sonra" };
+const MAKS_DENEME = 5;
+// denemeler: her "uyarla" sonucu; sonuc: kullanıcının seçtiği deneme (indirilen o olur)
+const durum = { analiz: null, sonuc: null, gorunum: "sonra", denemeler: [], secili: 0, girdi: null };
 const BASLIKLAR = { girdiler: "CV ve ilan", eslesme: "Eşleşme", sonuc: "Uyarlanmış CV", ayarlar: "Ayarlar" };
 
 // ------------------------------------------------------------------ yardımcılar
@@ -103,8 +105,13 @@ $("#ornek").addEventListener("click", async () => {
 });
 
 function girdiler() {
-  return { cv: $("#cv").value.trim(), ilan: $("#ilan").value.trim(), ad: $("#ad").value.trim(), dil: $("#dil").value };
+  return { cv: $("#cv").value.trim(), ilan: $("#ilan").value.trim(), ad: $("#ad").value.trim(), dil: $("#dil").value,
+    mod: $("input[name=mod]:checked")?.value || "hedef", ek: $("#ek").value.trim() };
 }
+
+// Ek bilgiler (GitHub'da olmayan projeler) her ilanda aynıdır: bu tarayıcıda hatırlanır
+try { $("#ek").value = localStorage.getItem("cv-ek") || ""; } catch { /* depolama kapalı */ }
+$("#ek").addEventListener("input", () => { try { localStorage.setItem("cv-ek", $("#ek").value); } catch { /* yok say */ } });
 
 // ------------------------------------------------------------------ ölçer
 function olcer() {
@@ -136,6 +143,11 @@ function eslesmeCiz(a) {
   $("#b-eslesen").innerHTML = etiketler(a.eslesen, "yesil", "Yok");
   $("#b-dolayli").innerHTML = etiketler(a.dolayli, "sari", "Yok");
   $("#b-eksik").innerHTML = etiketler(a.eksik, "pembe", "Eksik beceri yok");
+  const anahtarlar = a.anahtarlar || [];
+  $("#ats").textContent = anahtarlar.length ? `${anahtarlar.filter((k) => k.var).length}/${anahtarlar.length} · %${a.ats}` : "";
+  $("#b-anahtar").innerHTML = anahtarlar.length
+    ? anahtarlar.map((k) => `<span class="etiket ${k.var ? "yesil" : "pembe"}" title="${k.var ? "CV'nde geçiyor" : "CV'nde geçmiyor"}">${kacis(k.ifade)}</span>`).join("")
+    : '<span class="bos">Anahtar kelime çıkarılamadı.</span>';
   $("#yontem").textContent = a.embedding
     ? "Benzerlik, anlam (çok dilli embedding) ve kelime örtüşmesiyle bilgisayarında hesaplandı."
     : "Anlam modeli henüz hazır değil; benzerlik yalnızca kelime örtüşmesiyle hesaplandı.";
@@ -155,26 +167,70 @@ $("#olc").addEventListener("click", async () => {
   bekle(true, "Uyum ölçülüyor");
   try {
     durum.analiz = await (await api("/api/cv/analiz", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) })).json();
-    durum.sonuc = null;
+    durum.sonuc = null; durum.denemeler = [];
     olcer(); adimlariGuncelle(); eslesmeGoster(); git("eslesme");
   } catch (e) { bildir(e.message, true); } finally { bekle(false); }
 });
 
 // ------------------------------------------------------------------ uyarlama
-async function uyarla() {
-  const g = girdiler();
-  bekle(true, "Model CV'yi yeniden yazıyor");
+// İlk "CV'yi uyarla" denemeleri sıfırlar; "Bir daha uyarla" seçili denemenin zayıf kalan
+// gereksinimlerini modele geri verir ve yeni bir deneme ekler (en fazla MAKS_DENEME).
+async function uyarla(tekrar = false) {
+  if (!tekrar) { durum.girdi = girdiler(); durum.denemeler = []; }
+  if (durum.denemeler.length >= MAKS_DENEME) return;
+  const g = { ...durum.girdi };
+  if (tekrar && durum.sonuc) {
+    const s = durum.sonuc;
+    g.onceki = {
+      skor: s.sonra.skor,
+      zayiflar: [
+        ...s.sonra.gereksinimler.filter((x) => x.durum !== "karşılanıyor").map((x) => x.metin),
+        ...[...new Set([...s.sonra.eksik, ...(s.sonra.anahtarlar || []).filter((k) => !k.var).map((k) => k.ifade)])]
+          .map((x) => `CV'de geçmeyen ilan anahtar kelimesi (birebir geçir): ${x}`),
+      ],
+      projeler: (s.cv.projeler || []).filter((p) => p.yeni).map((p) => p.ad),
+      cv: s.cv, // model bu sürümün ÜZERİNE çalışır: iyi olanı bırakır, zayıfı düzeltir
+    };
+  }
+  const no = durum.denemeler.length + 1;
+  bekle(true, g.mod === "hedef" ? `Deneme ${no}/${MAKS_DENEME}: model CV'yi uyarlıyor ve projeler tasarlıyor` : `Deneme ${no}/${MAKS_DENEME}: model CV'yi yeniden yazıyor`);
   try {
-    durum.sonuc = await (await api("/api/cv/uyarla", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) })).json();
-    durum.gorunum = "sonra";
-    olcer(); adimlariGuncelle(); eslesmeGoster(); sonucCiz(); git("sonuc");
+    const s = await (await api("/api/cv/uyarla", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) })).json();
+    durum.denemeler.push(s);
+    denemeSec(durum.denemeler.length - 1);
+    adimlariGuncelle(); git("sonuc");
+    if (tekrar) bildir(`Deneme ${no}: uyum ${s.sonra.skor} / 100`);
   } catch (e) {
     bildir(e.message, true);
     if (/bağlantı|anahtar|GEMINI/i.test(e.message)) git("ayarlar");
-  } finally { bekle(false); }
+  } finally { bekle(false); denemeleriCiz(); }
 }
-$("#uyarla").addEventListener("click", uyarla);
-$("#uyarla2").addEventListener("click", uyarla);
+$("#uyarla").addEventListener("click", () => uyarla(false));
+$("#uyarla2").addEventListener("click", () => uyarla(false));
+$("#tekrar").addEventListener("click", () => uyarla(true));
+
+function denemeSec(i) {
+  durum.secili = i;
+  durum.sonuc = durum.denemeler[i];
+  durum.gorunum = "sonra";
+  olcer(); eslesmeGoster(); sonucCiz(); denemeleriCiz();
+}
+
+function denemeleriCiz() {
+  const d = durum.denemeler;
+  const enIyi = d.reduce((e, s, i) => (s.sonra.skor > d[e].sonra.skor ? i : e), 0);
+  $("#denemeler").innerHTML = d.map((s, i) => `
+    <button role="tab" data-i="${i}" aria-selected="${i === durum.secili}" class="deneme${i === enIyi && d.length > 1 ? " en-iyi" : ""}">
+      <span class="d-no">Deneme ${i + 1}</span><span class="d-skor">${s.sonra.skor}</span>
+      ${i === enIyi && d.length > 1 ? '<span class="d-rozet">en yüksek</span>' : ""}
+    </button>`).join("");
+  $$("#denemeler .deneme").forEach((b) => b.addEventListener("click", () => denemeSec(+b.dataset.i)));
+  const kalan = MAKS_DENEME - d.length;
+  const t = $("#tekrar");
+  t.disabled = kalan <= 0 || !d.length;
+  t.textContent = kalan > 0 ? `Bir daha uyarla (${kalan} hak kaldı)` : "Deneme hakkı bitti";
+  t.title = "Seçili denemenin üzerine çalışır: iyi olan kısımlar aynen kalır, yalnızca zayıf kalan gereksinimler düzeltilir.";
+}
 
 function sonucCiz() {
   const { baslik, cv } = durum.sonuc;
@@ -197,11 +253,26 @@ function sonucCiz() {
   if (cv.unvan) html += `<p class="k-unvan">${isaretle(cv.unvan)}</p>`;
   if (baslik.iletisim.length) html += `<p class="k-iletisim">${baslik.iletisim.map(kacis).join("  |  ")}</p>`;
   if (cv.ozet) html += bolum("Profesyonel Özet", "Professional Summary") + `<p>${isaretle(cv.ozet)}</p>`;
-  if (cv.beceriler.length) html += bolum("Beceriler", "Skills") + `<p>${cv.beceriler.map(isaretle).join("  •  ")}</p>`;
+  if (cv.beceriler.length) {
+    // Kategorili satırlar ("Programlama: Python, SQL") alt alta, düz liste tek satırda
+    const kategorili = cv.beceriler.some((b) => b.includes(":"));
+    html += bolum("Beceriler", "Skills") + (kategorili
+      ? cv.beceriler.map((b) => { const [k, ...d] = b.split(":"); return d.length ? `<p class="k-beceri"><strong>${kacis(k)}:</strong>${isaretle(d.join(":"))}</p>` : `<p class="k-beceri">${isaretle(b)}</p>`; }).join("")
+      : `<p>${cv.beceriler.map(isaretle).join("  •  ")}</p>`);
+  }
   if (cv.deneyim.length) {
     html += bolum("Deneyim", "Experience");
     for (const d of cv.deneyim) {
       html += `<div class="k-is"><strong>${isaretle([d.pozisyon, d.sirket].filter(Boolean).join(", "))}</strong><span class="k-tarih">${kacis(d.tarih)}</span></div>${maddeler(d.maddeler)}`;
+    }
+  }
+  if (cv.projeler?.length) {
+    html += bolum("Projeler", "Projects");
+    for (const p of cv.projeler) {
+      const tek = (p.teknolojiler || []).join(", ");
+      const rozet = p.kaynak === "yeni" ? '<span class="k-rozet" title="Bu proje CV\'nde yoktu: yapıp GitHub\'a koyman gerekiyor">yapılacak</span>'
+        : p.kaynak === "ek" ? '<span class="k-rozet ek" title="Ek bilgilerinden eklendi: GitHub\'a koy">GitHub\'a koy</span>' : "";
+      html += `<div class="k-is${p.kaynak === "yeni" ? " k-yeni" : p.kaynak === "ek" ? " k-ek" : ""}"><strong>${isaretle(p.ad)}${tek ? ` <span class="k-tek">· ${kacis(tek)}</span>` : ""}</strong>${rozet}</div>${maddeler(p.maddeler)}`;
     }
   }
   if (cv.egitim.length) {
@@ -218,7 +289,63 @@ function sonucCiz() {
   liste("#uyarilar", cv.uydurma_supheleri, "");
   liste("#degisiklikler", cv.degisiklikler, "Model değişiklik açıklaması vermedi.");
   liste("#oneriler", cv.oneriler, "Öneri yok.");
-  $("#model-notu").textContent = `Yeniden yazan model: ${cv.model}`;
+  $("#model-notu").textContent = `Yeniden yazan model: ${cv.model}` +
+    (cv.tur > 1 ? " · Skor 90'ın altında kaldığı için otomatik ikinci turla iyileştirildi." : "");
+  const sorular = cv.guclendirme_sorulari || [];
+  $("#kutu-sorular").hidden = !sorular.length;
+  $("#sorular").innerHTML = sorular.map((s) => `<li><strong>${kacis(s.soru)}</strong>${s.madde ? `<span class="s-madde">${kacis(s.madde)}</span>` : ""}</li>`).join("");
+
+  const eklenen = cv.eklenen_beceriler || [];
+  $("#kutu-eklenen").hidden = !eklenen.length;
+  $("#eklenenler").innerHTML = eklenen.map((b) => `<span class="etiket sari">${kacis(b)}</span>`).join("");
+  yapilacaklarCiz(cv.yapilacaklar || []);
+  planCiz();
+}
+
+// Her ilan gereksinimi için: önce ne durumdaydı, sonra ne oldu, ne yapıldı
+function planCiz() {
+  const { once, sonra, cv } = durum.sonuc;
+  const degisen = new Set(cv.degisen_korunan || []);
+  const yeniProje = (cv.projeler || []).some((p) => p.yeni);
+  const satirlar = once.gereksinimler.map((g, i) => {
+    const s = sonra.gereksinimler[i] || g;
+    let tur, metin;
+    if (g.durum === "karşılanıyor") {
+      [tur, metin] = degisen.has(g.en_yakin) ? ["ifade", "Zaten vardı, cümle yeniden ifade edildi"] : ["koru", "Zaten vardı, dokunulmadı"];
+    } else if (s.durum === "karşılanıyor") {
+      [tur, metin] = g.durum === "kısmen" ? ["guclu", "Kısmen vardı, güçlendirildi"] : ["ekle", yeniProje ? "Yoktu, projeyle eklendi" : "Yoktu, eklendi"];
+    } else {
+      [tur, metin] = ["zayif", s.durum === "kısmen" ? "Hâlâ kısmen karşılanıyor" : "Hâlâ eksik"];
+    }
+    return { tur, metin, g: g.metin };
+  });
+  const say = (t) => satirlar.filter((x) => x.tur === t).length;
+  $("#plan-ozet").textContent = `${say("koru") + say("ifade")} zaten vardı · ${say("guclu")} güçlendirildi · ${say("ekle")} eklendi · ${say("zayif")} hâlâ zayıf`;
+  const sira = { zayif: 0, ekle: 1, guclu: 2, ifade: 3, koru: 4 };
+  $("#plan").innerHTML = satirlar.sort((a, b) => sira[a.tur] - sira[b.tur]).map((x) =>
+    `<li class="plan-${x.tur}"><span class="p-etiket">${kacis(x.metin)}</span><span class="p-metin">${kacis(x.g)}</span></li>`).join("")
+    || '<li class="bos">İlanda gereksinim bulunamadı.</li>';
+}
+
+function yapilacaklarCiz(liste) {
+  $("#yapilacaklar-bolumu").hidden = !liste.length;
+  $("#yapilacaklar").innerHTML = liste.map((y) => {
+    const gh = y.github || {};
+    const readme = (gh.readme || []).map((r) => `<li>${kacis(r)}</li>`).join("");
+    const yayinla = y.tur === "yayinla";
+    return `<li class="y-kart${yayinla ? " yayinla" : ""}">
+      <div class="y-ust"><h3>${kacis(y.proje)}</h3><span class="y-tur">${yayinla ? "Bilgisayarında var · GitHub'a koy" : "Yap ve GitHub'a koy"}</span>${y.sure ? `<span class="y-sure">${kacis(y.sure)}</span>` : ""}</div>
+      <p class="y-neden">${kacis(y.neden)}</p>
+      ${(y.kapsadigi || []).length ? `<div class="etiketler">${y.kapsadigi.map((k) => `<span class="etiket yesil">${kacis(k)}</span>`).join("")}</div>` : ""}
+      <div class="y-govde">
+        <div><h4>${yayinla ? "Yayınlamadan önce" : "Nasıl yapacaksın"}</h4><ol>${(y.adimlar || []).map((a) => `<li>${kacis(a.replace(/^\d+[.)]\s*/, ""))}</li>`).join("")}</ol></div>
+        <div><h4>Sonra GitHub'a koy</h4>
+          ${gh.repo ? `<p class="y-repo"><code>github.com/&lt;kullanıcı-adın&gt;/${kacis(gh.repo)}</code></p>` : ""}
+          ${readme ? `<p class="y-alt">README'de olsun:</p><ul>${readme}</ul>` : ""}
+        </div>
+      </div>
+    </li>`;
+  }).join("");
 }
 
 // ------------------------------------------------------------------ indirme
@@ -258,6 +385,14 @@ async function durumYenile() {
     el.title = d.model ? "" : "CV'yi uyarlamak için Ayarlar'dan bir model bağla. Uyum ölçümü modelsiz çalışır.";
     $("#model-uyari").hidden = !!d.model;
     $("#ayar-url").value = d.llm_base_url || "";
+    const sec = $("#ayar-model");
+    if (!sec.options.length || document.activeElement !== sec) {
+      sec.replaceChildren(...d.gemini_secenekleri.map((m) => {
+        const o = new Option(`${m.ad} · ${m.not}`, m.id);
+        o.selected = m.id === (d.gemini_model || d.gemini_varsayilan);
+        return o;
+      }));
+    }
     $("#anahtar-durum").textContent = d.gemini_anahtari_var ? "· Şu an bir anahtar tanımlı." : "";
     const dis = d.disaridan.length;
     $("#ayar-disaridan").hidden = !dis;
@@ -273,7 +408,7 @@ $("#ayara-git").addEventListener("click", () => { git("ayarlar"); $("#ayar-anaht
 
 $("#ayar-formu").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const govde = { llm_base_url: $("#ayar-url").value.trim() };
+  const govde = { llm_base_url: $("#ayar-url").value.trim(), gemini_model: $("#ayar-model").value };
   const anahtar = $("#ayar-anahtar").value.trim();
   if (anahtar) govde.gemini_api_key = anahtar;
   try {

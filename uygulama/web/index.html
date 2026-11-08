@@ -60,6 +60,10 @@
           <label class="alan"><span>Ad Soyad</span>
             <input id="ad" placeholder="Boş bırakırsan CV'nin ilk satırı kullanılır" autocomplete="name">
           </label>
+          <label class="alan"><span>CV'nde yazmayan projelerin ve becerilerin <em class="istege">isteğe bağlı</em></span>
+            <textarea id="ek" class="kisa" spellcheck="false" placeholder="Bilgisayarında olup GitHub'a koymadığın projeler, bildiğin ama CV'ye yazmadığın beceriler. Örnek:&#10;- Flask ile stok takip API'si yazdım (SQLite, JWT)&#10;- Kaggle'da Titanic ve ev fiyatı tahmini notebook'ları&#10;- Docker ile birkaç servisi ayağa kaldırdım"></textarea>
+            <small>Bunlar doğru kabul edilip CV'ye eklenir, uygulama sana "bunu GitHub'a koy" görevi verir. Bu bilgisayarda hatırlanır.</small>
+          </label>
         </div>
         <div class="kart">
           <div class="kart-bas"><h2>İş ilanı</h2><button class="baglanti" id="ornek">Örnek CV ve ilanla dene</button></div>
@@ -67,6 +71,13 @@
           <label class="alan"><span>CV dili</span>
             <select id="dil"><option value="ilan">İlanla aynı dil</option><option value="tr">Türkçe</option><option value="en">İngilizce</option></select>
           </label>
+          <fieldset class="mod-secimi">
+            <legend>Uyarlama biçimi</legend>
+            <label class="mod"><input type="radio" name="mod" value="hedef" checked>
+              <span><strong>Uyumu 90'a çıkar</strong>İlanın istediği ama CV'nde olmayan beceriler için yapabileceğin projeler ekler ve nasıl yapacağını anlatır.</span></label>
+            <label class="mod"><input type="radio" name="mod" value="temkinli">
+              <span><strong>Sadece mevcut bilgilerim</strong>Hiçbir şey eklemez; CV'ndekileri ilana göre yeniden yazar.</span></label>
+          </fieldset>
         </div>
       </div>
       <div class="eylemler">
@@ -91,10 +102,15 @@
           <p class="not" id="yontem"></p>
         </div>
         <aside class="kart beceri-karti">
+          <div class="beceri-grup">
+            <h3>İlanın anahtar kelimeleri <span class="ats" id="ats"></span></h3>
+            <p class="aciklama">ATS'lerin aradığı ifadeler. İlandan yerel bir ML modeliyle (embedding + MMR) çıkarıldı; yeşiller CV'nde geçiyor.</p>
+            <div class="etiketler" id="b-anahtar"></div>
+          </div>
           <h2>Beceriler</h2>
           <div class="beceri-grup"><h3>CV'nde var</h3><div class="etiketler" id="b-eslesen"></div></div>
           <div class="beceri-grup"><h3>Dolaylı var, adıyla yazılmalı</h3><p class="aciklama">Örneğin scikit-learn kullanmışsan "makine öğrenmesi" yazabilirsin.</p><div class="etiketler" id="b-dolayli"></div></div>
-          <div class="beceri-grup"><h3>CV'nde yok</h3><p class="aciklama">Uyarlarken eklenmez, öneri olarak sunulur.</p><div class="etiketler" id="b-eksik"></div></div>
+          <div class="beceri-grup"><h3>CV'nde yok</h3><p class="aciklama">"Uyumu 90'a çıkar" seçiliyse yapabileceğin projelerle CV'ye eklenir.</p><div class="etiketler" id="b-eksik"></div></div>
         </aside>
       </div>
       <div class="eylemler" id="eslesme-eylem">
@@ -105,6 +121,10 @@
 
     <!-- 3. Sonuç -->
     <section class="ekran" id="ekran-sonuc" hidden>
+      <div class="denemeler-cubugu">
+        <div class="denemeler" id="denemeler" role="tablist" aria-label="Denemeler"></div>
+        <button class="ikincil" id="tekrar" type="button">Bir daha uyarla</button>
+      </div>
       <div class="sonuc">
         <div class="masa"><article class="kagit" id="kagit"></article></div>
         <aside class="denetci">
@@ -117,11 +137,35 @@
             <p>Bunlar orijinal CV'nde geçmiyor. Model eklemiş olabilir; doğru değilse sil.</p>
             <ul id="uyarilar"></ul>
           </div>
+          <div class="kutu eklenen" id="kutu-eklenen" hidden>
+            <h3>Yeni projelerle eklenen beceriler</h3>
+            <p>CV'nde yoktu, aşağıdaki projeleri yapınca senin olacak.</p>
+            <div class="etiketler" id="eklenenler"></div>
+          </div>
+          <div class="kutu plan-kutusu">
+            <h3>Gereksinim gereksinim ne yapıldı</h3>
+            <p id="plan-ozet"></p>
+            <ul class="plan" id="plan"></ul>
+          </div>
+          <div class="kutu sorular" id="kutu-sorular" hidden>
+            <h3>Maddeleri güçlendirmek için sorular</h3>
+            <p>Cevabın bir sayıysa ilgili maddeye ekle; sayı içeren maddeler çok daha güçlü durur.</p>
+            <ul id="sorular"></ul>
+          </div>
           <div class="kutu"><h3>Ne değişti</h3><ul id="degisiklikler"></ul></div>
-          <div class="kutu"><h3>Eksikler için öneriler</h3><ul id="oneriler"></ul></div>
+          <div class="kutu"><h3>Diğer öneriler</h3><ul id="oneriler"></ul></div>
           <p class="not" id="model-notu"></p>
         </aside>
       </div>
+
+      <section class="yapilacaklar" id="yapilacaklar-bolumu" hidden>
+        <div class="y-bas">
+          <h2>Senin yapman gerekenler</h2>
+          <p>Bu ilan için CV'ne eklediğim projeler. <strong>Başvurmadan önce GitHub'a koy</strong>:
+            işe alımcılar repoya bakar, mülakatta da sorarlar. Hem CV'n dolu olur hem kendini geliştirirsin.</p>
+        </div>
+        <ol class="y-liste" id="yapilacaklar"></ol>
+      </section>
     </section>
 
     <!-- Ayarlar -->
@@ -133,6 +177,10 @@
         <label class="alan"><span>Gemini API anahtarı</span>
           <input id="ayar-anahtar" type="password" autocomplete="off" placeholder="Değiştirmek için yeni anahtarı yaz">
           <small>Ücretsiz anahtar: aistudio.google.com/apikey <span id="anahtar-durum"></span></small>
+        </label>
+        <label class="alan"><span>Gemini modeli</span>
+          <select id="ayar-model"></select>
+          <small id="ayar-model-not">Seçtiğin model cevap veremezse (kota, yoğunluk) otomatik olarak Gemini 3 Flash'a geçilir.</small>
         </label>
         <label class="alan"><span>Gateway adresi (isteğe bağlı)</span>
           <input id="ayar-url" placeholder="http://localhost:4000">

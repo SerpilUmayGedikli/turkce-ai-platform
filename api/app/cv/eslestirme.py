@@ -18,7 +18,7 @@ import numpy as np
 
 from ..rag.turkce import isle
 from ..rag.vektor import Gomucu
-from . import beceriler
+from . import anahtar, beceriler
 
 KARSILANIYOR, KISMEN = 0.55, 0.35
 TERCIH_AGIRLIGI = 0.5
@@ -55,6 +55,13 @@ class Analiz:
     ima_edilen_beceriler: set[str] = field(default_factory=set)  # dolaylı var, adıyla yazılmalı
     eksik_beceriler: set[str] = field(default_factory=set)
     embedding: bool = False  # anlam benzerliği kullanıldı mı?
+    anahtarlar: list[anahtar.Anahtar] = field(default_factory=list)  # ilanın ATS kelimeleri
+
+    @property
+    def ats_kapsama(self) -> int:
+        """İlanın anahtar kelimelerinin yüzde kaçı CV'de geçiyor (0-100)."""
+        return round(100 * sum(a.var for a in self.anahtarlar) / len(self.anahtarlar)) \
+            if self.anahtarlar else 0
 
     @property
     def eksik_gereksinimler(self) -> list[Gereksinim]:
@@ -110,7 +117,7 @@ def _anlam_olcekle(benzerlik: np.ndarray) -> np.ndarray:
     return np.clip((benzerlik - 0.30) / (0.75 - 0.30), 0.0, 1.0)
 
 
-def analiz_et(cv: str, ilan: str, gomucu: Gomucu | None = None) -> Analiz:
+def analiz_et(cv: str, ilan: str, gomucu: Gomucu | None = None, ek: str = "") -> Analiz:
     gereksinimler = gereksinimleri_ayir(ilan)
     from .okuyucu import baslik_cikar  # noqa: PLC0415
 
@@ -137,6 +144,9 @@ def analiz_et(cv: str, ilan: str, gomucu: Gomucu | None = None) -> Analiz:
             g.en_yakin = cv_cumleleri[int(en_yakin_idx[i])]
         else:
             g.skor = kelime
+            if cv_cumleleri:  # anlam modeli yoksa en yakın cümle kelime örtüşmesiyle seçilir
+                g.en_yakin = max(cv_cumleleri,
+                                 key=lambda c, m=g.metin: _kelime_ortusmesi(m, _terimler(c)))
         if beceri is not None:  # cümlede somut bir beceri varsa onun karşılanması belirleyici
             g.skor = 0.5 * g.skor + 0.5 * beceri
         g.durum = ("karşılanıyor" if g.skor >= KARSILANIYOR
@@ -165,6 +175,7 @@ def analiz_et(cv: str, ilan: str, gomucu: Gomucu | None = None) -> Analiz:
         ima_edilen_beceriler=ima,
         eksik_beceriler=ilan_beceri - cv_beceri - ima,
         embedding=anlam is not None,
+        anahtarlar=anahtar.kapsama(anahtar.cikar(ilan, gomucu), cv, ek),
     )
 
 

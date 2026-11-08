@@ -16,7 +16,7 @@ from .test_cv import CV, ILAN, MODEL_CEVABI, SahteIstemci
 @pytest.fixture
 def istemci(monkeypatch, tmp_path):
     monkeypatch.setenv("APPDATA", str(tmp_path))  # ayarlar geçici klasöre yazılsın
-    for k in ("LLM_BASE_URL", "GEMINI_API_KEY"):
+    for k in ("LLM_BASE_URL", "GEMINI_API_KEY", "GEMINI_MODEL"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setattr(web_api, "_gomucu", {"g": None})  # embedding indirme yok
     app = FastAPI()
@@ -27,7 +27,7 @@ def istemci(monkeypatch, tmp_path):
 def test_ornek_ve_analiz(istemci):
     ornek = istemci.get("/api/ornek").json()
     a = istemci.post("/api/cv/analiz", json=ornek).json()
-    assert 0 < a["skor"] <= 100
+    assert 0 < a["skor"] <= 100 and a["anahtarlar"] and 0 <= a["ats"] <= 100
     assert "Python" in a["eslesen"] and "PyTorch" in a["eksik"]
     assert all(g["durum"] in ("karşılanıyor", "kısmen", "eksik") for g in a["gereksinimler"])
     assert not any(g["en_yakin"] == "Elif Kaya" for g in a["gereksinimler"])  # ad satırı eşleşmez
@@ -81,6 +81,20 @@ def test_kapali_gateway_gemini_ye_duser(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "x")
     _, modeller = yazici.baglanti()
     assert modeller == yazici.GEMINI_MODELLERI
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.8-flash")  # seçilen başa, yedekler arkaya
+    _, modeller = yazici.baglanti()
+    assert modeller[0] == "gemini-3.8-flash" and "gemini-3-flash-preview" in modeller[1:]
+    monkeypatch.delenv("GEMINI_MODEL")
     monkeypatch.delenv("GEMINI_API_KEY")
     _, modeller = yazici.baglanti()  # yedek yoksa gateway'i dener (hata mesajı oradan gelir)
     assert modeller != yazici.GEMINI_MODELLERI
+
+
+def test_model_secimi(istemci):
+    d = istemci.get("/api/durum").json()
+    assert any(s["id"] == d["gemini_varsayilan"] for s in d["gemini_secenekleri"])
+    r = istemci.post("/api/ayarlar", json={"gemini_api_key": "x", "gemini_model": "gemini-3.8-flash"}).json()
+    assert r["model"] == "gemini-3.8-flash" and r["gemini_model"] == "gemini-3.8-flash"
+    assert istemci.post("/api/ayarlar", json={"gemini_model": "gpt-9"}).status_code == 422
+    r = istemci.post("/api/ayarlar", json={"gemini_model": ""}).json()  # boş = önerilene dön
+    assert r["model"] == d["gemini_varsayilan"]

@@ -10,9 +10,9 @@ from .yazici import UyarlanmisCV
 
 BOLUMLER = {
     "tr": {"ozet": "Profesyonel Özet", "beceri": "Beceriler", "deneyim": "Deneyim",
-           "egitim": "Eğitim"},
+           "egitim": "Eğitim", "proje": "Projeler"},
     "en": {"ozet": "Professional Summary", "beceri": "Skills", "deneyim": "Experience",
-           "egitim": "Education"},
+           "egitim": "Education", "proje": "Projects"},
 }
 
 # Türkçe karakterler için Unicode TTF gerekir (fpdf'in yerleşik fontları ş/ğ/ı basamaz)
@@ -46,6 +46,11 @@ def _buyuk(metin: str, cv: UyarlanmisCV) -> str:
 def _deneyim_basligi(d: dict) -> tuple[str, str]:
     sol = " · ".join(x for x in (d.get("pozisyon"), d.get("sirket")) if x)
     return sol, d.get("tarih") or ""
+
+
+def _proje_basligi(p: dict) -> str:
+    teknoloji = ", ".join(p.get("teknolojiler") or [])
+    return f"{p.get('ad', '')} · {teknoloji}" if teknoloji else p.get("ad", "")
 
 
 def _egitim_satiri(e: dict) -> str:
@@ -87,7 +92,18 @@ def docx_yaz(baslik: Baslik, cv: UyarlanmisCV) -> bytes:
         belge.add_paragraph(cv.ozet)
     if cv.beceriler:
         baslik_ekle(b["beceri"])
-        belge.add_paragraph(" • ".join(cv.beceriler))
+        if any(":" in x for x in cv.beceriler):  # kategorili satırlar alt alta, kategori kalın
+            for satir in cv.beceriler:
+                p = belge.add_paragraph()
+                p.paragraph_format.space_after = Pt(1)
+                kategori, _, deger = satir.partition(":")
+                if deger:
+                    p.add_run(f"{kategori}:").bold = True
+                    p.add_run(deger)
+                else:
+                    p.add_run(satir)
+        else:
+            belge.add_paragraph(" • ".join(cv.beceriler))
     if cv.deneyim:
         baslik_ekle(b["deneyim"])
         for d in cv.deneyim:
@@ -98,6 +114,14 @@ def docx_yaz(baslik: Baslik, cv: UyarlanmisCV) -> bytes:
             if tarih:
                 p.add_run(f"   {tarih}").italic = True
             for madde in d.get("maddeler", []):
+                belge.add_paragraph(madde, style="List Bullet")
+    if cv.projeler:
+        baslik_ekle(b["proje"])
+        for pr in cv.projeler:
+            p = belge.add_paragraph()
+            p.paragraph_format.space_after = Pt(1)
+            p.add_run(_proje_basligi(pr)).bold = True
+            for madde in pr.get("maddeler", []):
                 belge.add_paragraph(madde, style="List Bullet")
     if cv.egitim:
         baslik_ekle(b["egitim"])
@@ -162,13 +186,24 @@ def pdf_yaz(baslik: Baslik, cv: UyarlanmisCV) -> bytes:
         yaz(cv.ozet)
     if cv.beceriler:
         bolum(b["beceri"])
-        yaz(" • ".join(cv.beceriler))
+        if any(":" in x for x in cv.beceriler):
+            for satir in cv.beceriler:
+                yaz(satir)
+        else:
+            yaz(" • ".join(cv.beceriler))
     if cv.deneyim:
         bolum(b["deneyim"])
         for d in cv.deneyim:
             sol, tarih = _deneyim_basligi(d)
             yaz(f"{sol}   {tarih}".strip(), 10.5, True, h=6)
             for m in d.get("maddeler", []):
+                madde(m)
+            pdf.ln(1)
+    if cv.projeler:
+        bolum(b["proje"])
+        for pr in cv.projeler:
+            yaz(_proje_basligi(pr), 10.5, True, h=6)
+            for m in pr.get("maddeler", []):
                 madde(m)
             pdf.ln(1)
     if cv.egitim:
