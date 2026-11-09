@@ -195,7 +195,7 @@ async function uyarla(tekrar = false) {
     };
   }
   const no = durum.denemeler.length + 1;
-  bekle(true, g.mod === "hedef" ? `Deneme ${no}/${MAKS_DENEME}: model CV'yi uyarlıyor ve projeler tasarlıyor` : `Deneme ${no}/${MAKS_DENEME}: model CV'yi yeniden yazıyor`);
+  bekle(true, g.mod === "hedef" ? `Deneme ${no}/${MAKS_DENEME}: CV uyarlanıyor ve projeler tasarlanıyor (yerel modelde birkaç dakika sürebilir)` : `Deneme ${no}/${MAKS_DENEME}: CV yeniden yazılıyor`);
   try {
     const s = await (await api("/api/cv/uyarla", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) })).json();
     durum.denemeler.push(s);
@@ -232,6 +232,11 @@ function denemeleriCiz() {
   t.disabled = kalan <= 0 || !d.length;
   t.textContent = kalan > 0 ? `Bir daha uyarla (${kalan} hak kaldı)` : "Deneme hakkı bitti";
   t.title = "Seçili denemenin üzerine çalışır: iyi olan kısımlar aynen kalır, yalnızca zayıf kalan gereksinimler düzeltilir.";
+  if (durum.sonuc?.cv.model?.includes("çevrimdışı")) { // kurallarla çalışır: tekrar aynı sonucu verir
+    t.disabled = true;
+    t.textContent = "Çevrimdışı motor: tek deneme yeterli";
+    t.title = "Çevrimdışı motor kurallarla çalışır ve her seferinde aynı sonucu verir. Farklı denemeler için Ayarlar'dan Gemini ya da yerel model seç.";
+  }
 }
 
 function sonucCiz() {
@@ -382,10 +387,12 @@ async function durumYenile() {
     const d = await (await api("/api/durum")).json();
     const el = $("#durum");
     const embed = { hazir: "", yukleniyor: " · anlam modeli yükleniyor", yok: " · anlam modeli yok" }[d.embedding];
-    el.className = `durum ${d.model ? "iyi" : "kotu"}`;
-    $("#durum-metin").textContent = d.model ? `Model: ${d.model}${embed}` : "Model bağlı değil";
-    el.title = d.model ? "" : "CV'yi uyarlamak için Ayarlar'dan bir model bağla. Uyum ölçümü modelsiz çalışır.";
+    el.className = "durum iyi";
+    $("#durum-metin").textContent = d.model ? `${d.yerel_model ? "Yerel model" : "Model"}: ${d.model}${embed}` : `Çevrimdışı motor${embed}`;
+    el.title = d.model ? "" : "API anahtarı ve internet olmadan, yerel kurallar ve yerel ML ile uyarlanır.";
     $("#model-uyari").hidden = !!d.model;
+    const motor = $(`input[name=motor][value="${d.motor_ayari || "otomatik"}"]`);
+    if (motor && !$("#motor-secimi").contains(document.activeElement)) motor.checked = true;
     $("#ayar-url").value = d.llm_base_url || "";
     const sec = $("#ayar-model");
     if (!sec.options.length || document.activeElement !== sec) {
@@ -410,7 +417,8 @@ $("#ayara-git").addEventListener("click", () => { git("ayarlar"); $("#ayar-anaht
 
 $("#ayar-formu").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const govde = { llm_base_url: $("#ayar-url").value.trim(), gemini_model: $("#ayar-model").value };
+  const govde = { llm_base_url: $("#ayar-url").value.trim(), gemini_model: $("#ayar-model").value,
+    motor: $("input[name=motor]:checked")?.value || "otomatik" };
   const anahtar = $("#ayar-anahtar").value.trim();
   if (anahtar) govde.gemini_api_key = anahtar;
   try {

@@ -45,10 +45,11 @@
 
     <!-- 1. Girdiler -->
     <section class="ekran" id="ekran-girdiler">
-      <div class="uyari-serit" id="model-uyari" role="alert" hidden>
+      <div class="uyari-serit bilgi" id="model-uyari" role="status" hidden>
         <div>
-          <strong>Model bağlı değil.</strong>
-          Uyumu ölçebilirsin ama CV'yi yeniden yazmak için bir Gemini API anahtarı gerekiyor.
+          <strong>Çevrimdışı moddasın.</strong>
+          CV, API anahtarı ve internet olmadan bilgisayarındaki kurallar ve yerel ML ile uyarlanır.
+          Daha akıcı yazım için Ayarlar'dan ücretsiz Gemini anahtarı ya da yerel model (Ollama) seçebilirsin.
         </div>
         <button class="ikincil" id="ayara-git" type="button">Ayarlar'a git</button>
       </div>
@@ -241,9 +242,17 @@
     <!-- Ayarlar -->
     <section class="ekran" id="ekran-ayarlar" hidden>
       <form class="kart ayarlar" id="ayar-formu">
-        <h2>Model bağlantısı</h2>
-        <p class="aciklama">CV'yi yeniden yazmak için bir dil modeli gerekir. İkisinden birini doldurman yeterli.
-          Ayarlar yalnızca bu bilgisayarda saklanır.</p>
+        <h2>Uyarlama motoru</h2>
+        <p class="aciklama">Ayarlar yalnızca bu bilgisayarda saklanır.</p>
+        <fieldset class="mod-secimi" id="motor-secimi">
+          <label class="mod"><input type="radio" name="motor" value="otomatik">
+            <span><strong>Otomatik (önerilen)</strong>Gemini anahtarın varsa Gemini, yoksa birkaç saniyede çalışan çevrimdışı motor. Model hata verirse (kota, internet yok) çevrimdışı motora geçilir.</span></label>
+          <label class="mod"><input type="radio" name="motor" value="yerel">
+            <span><strong>Yerel model (Ollama) · anahtarsız, internetsiz</strong><span id="yerel-durum">Bilgisayarındaki dil modeli yazar. Akıcıdır ama ekran kartı yoksa çok yavaştır: 12B gibi büyük modeller 15 dakikada bile bitiremeyebilir. 3–4B'lik küçük bir model önerilir (ör. ollama pull qwen3:4b).</span></span></label>
+          <label class="mod"><input type="radio" name="motor" value="cevrimdisi">
+            <span><strong>Çevrimdışı motor · anahtarsız, internetsiz, anında</strong>Dil modeli kullanmaz: CV cümlelerine dokunmadan ilana göre sıralar, becerileri düzenler, eksikler için katalogdan proje önerir.</span></label>
+        </fieldset>
+        <h3 class="ayar-alt">Gemini (isteğe bağlı)</h3>
         <label class="alan"><span>Gemini API anahtarı</span>
           <input id="ayar-anahtar" type="password" autocomplete="off" placeholder="Değiştirmek için yeni anahtarı yaz">
           <small>Ücretsiz anahtar: aistudio.google.com/apikey <span id="anahtar-durum"></span></small>

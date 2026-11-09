@@ -16,7 +16,8 @@ from .test_cv import CV, ILAN, MODEL_CEVABI, SahteIstemci
 @pytest.fixture
 def istemci(monkeypatch, tmp_path):
     monkeypatch.setenv("APPDATA", str(tmp_path))  # ayarlar geçici klasöre yazılsın
-    for k in ("LLM_BASE_URL", "GEMINI_API_KEY", "GEMINI_MODEL"):
+    monkeypatch.setenv("OLLAMA_URL", "http://127.0.0.1:9")  # gerçek yerel modele gitme
+    for k in ("LLM_BASE_URL", "GEMINI_API_KEY", "GEMINI_MODEL", "CV_MOTOR"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setattr(web_api, "_gomucu", {"g": None})  # embedding indirme yok
     app = FastAPI()
@@ -51,9 +52,39 @@ def test_dosya_okuma(istemci):
     assert r.status_code == 415
 
 
-def test_model_yoksa_anlasilir_hata(istemci):
-    r = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN})
-    assert r.status_code == 503 and "GEMINI_API_KEY" in r.json()["detail"]
+def test_model_yoksa_cevrimdisi_motor_calisir(istemci, monkeypatch):
+    monkeypatch.setattr(yazici, "_ulasilabilir", lambda *a, **k: False)  # Ollama da yok
+    d = istemci.get("/api/durum").json()
+    assert d["model"] is None and d["motor"] == "cevrimdisi"
+    r = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN, "ek": "- Flask ile stok API'si yazdım"})
+    assert r.status_code == 200
+    s = r.json()
+    assert "çevrimdışı" in s["cv"]["model"] and s["sonra"]["skor"] > s["once"]["skor"]
+    assert s["cv"]["uydurma_supheleri"] == [] and s["cv"]["yapilacaklar"]
+    assert "elif.kaya@ornek.com" not in s["cv"]["modele_giden"]
+    # Belge de üretilir
+    d = istemci.post("/api/cv/belge?bicim=docx", json={"baslik": s["baslik"], "cv": s["cv"]})
+    assert d.status_code == 200 and d.content[:2] == b"PK"
+
+
+def test_cevrimdisi_ayari_anahtar_olsa_da_kullanilir(istemci, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(yazici, "baglanti", lambda: (_ for _ in ()).throw(AssertionError("modele gidilmemeli")))
+    istemci.post("/api/ayarlar", json={"motor": "cevrimdisi"})
+    assert istemci.get("/api/durum").json()["motor"] == "cevrimdisi"
+    s = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN}).json()
+    assert "çevrimdışı" in s["cv"]["model"]
+    assert istemci.post("/api/ayarlar", json={"motor": "bulut"}).status_code == 422
+
+
+def test_model_hata_verirse_cevrimdisina_duser(istemci, monkeypatch):
+    class Bozuk:
+        chat = type("C", (), {"completions": type("K", (), {"create": staticmethod(
+            lambda **k: (_ for _ in ()).throw(RuntimeError("429 kota")))})()})()
+
+    monkeypatch.setattr(yazici, "baglanti", lambda: (Bozuk(), ["gemini-x"]))
+    s = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN}).json()
+    assert "çevrimdışı" in s["cv"]["model"] and "Model cevap veremedi" in s["cv"]["degisiklikler"][0]
 
 
 def test_uyarla_ve_belge(istemci, monkeypatch):
@@ -177,3 +208,28 @@ def test_gunluk_tur_isaretleme_seri_ve_ertesi_gun_sifirlanma(istemci, monkeypatc
 
     SahteTarih.bugun = dt.date(2026, 11, 13)  # iki gün atlandı: seri kırılır
     assert istemci.get("/api/platformlar").json()["seri"] == 0
+
+
+def test_yerel_model_ayari_ollama_kullanir(istemci, monkeypatch):
+    monkeypatch.setattr(yazici, "ollama_baglanti", lambda: (SahteIstemci(MODEL_CEVABI), ["gemma-yerel"]))
+    monkeypatch.setattr(yazici, "baglanti", lambda: (_ for _ in ()).throw(AssertionError("Gemini'ye gidilmemeli")))
+    istemci.post("/api/ayarlar", json={"motor": "yerel"})
+    d = istemci.get("/api/durum").json()
+    assert d["model"] == "gemma-yerel" and d["motor_ayari"] == "yerel"
+    s = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN}).json()
+    assert s["cv"]["model"] == "sahte-model"
+    monkeypatch.setattr(yazici, "ollama_baglanti", lambda: (None, []))  # Ollama kapalı: çevrimdışına düş
+    s = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN}).json()
+    assert "çevrimdışı" in s["cv"]["model"]
+
+
+def test_otomatik_mod_yerel_modeli_denemez(istemci, monkeypatch):
+    """Anahtar yoksa otomatik mod Ollama'yı (işlemcide 15 dk sürebilir) atlayıp çevrimdışı motora geçer."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.setattr(yazici, "ollama_baglanti",
+                        lambda: (_ for _ in ()).throw(AssertionError("Ollama denenmemeli")))
+    assert yazici.baglanti() == (None, [])
+    assert istemci.get("/api/durum").json()["motor"] == "cevrimdisi"
+    s = istemci.post("/api/cv/uyarla", json={"cv": CV, "ilan": ILAN}).json()
+    assert "çevrimdışı" in s["cv"]["model"]

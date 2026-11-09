@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-ALANLAR = ("LLM_BASE_URL", "LITELLM_MASTER_KEY", "GEMINI_API_KEY", "GEMINI_MODEL", "CV_MODEL")
+ALANLAR = ("LLM_BASE_URL", "LITELLM_MASTER_KEY", "GEMINI_API_KEY", "GEMINI_MODEL", "CV_MODEL", "CV_MOTOR")
 
 
 def klasor() -> Path:

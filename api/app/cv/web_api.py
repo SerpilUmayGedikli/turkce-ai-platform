@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import threading
 from dataclasses import asdict
@@ -20,11 +21,11 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from . import ayarlar, calistir, ilanlar
+from . import ayarlar, calistir, ilanlar, yazici
 from .cikti import docx_yaz, pdf_yaz
 from .eslestirme import Analiz, analiz_et, varsayilan_gomucu
 from .okuyucu import Baslik, baslik_cikar, metne_cevir
-from .yazici import GEMINI_SECENEKLERI, GEMINI_VARSAYILAN, UyarlanmisCV, baglanti
+from .yazici import GEMINI_SECENEKLERI, GEMINI_VARSAYILAN, UyarlanmisCV
 
 router = APIRouter(prefix="/api")
 MAKS_DOSYA = 10 * 1024 * 1024
@@ -81,13 +82,20 @@ class AyarIstegi(BaseModel):
     llm_base_url: str | None = None
     gemini_api_key: str | None = None
     gemini_model: str | None = None
+    motor: Literal["otomatik", "yerel", "cevrimdisi"] | None = None
 
 
 @router.get("/durum")
 def durum() -> dict[str, Any]:
-    client, modeller = baglanti()
+    motor = os.getenv("CV_MOTOR", "otomatik")
+    client, modeller = ((None, []) if motor == "cevrimdisi" else
+                        yazici.ollama_baglanti() if motor == "yerel" else yazici.baglanti())
     return {
+        # model None ise CV çevrimdışı motorla uyarlanır (API anahtarı ve internet gerekmez)
         "model": modeller[0] if client else None,
+        "motor": "llm" if client else "cevrimdisi",
+        "motor_ayari": motor,
+        "yerel_model": bool(client) and "11434" in str(getattr(client, "base_url", "")),
         "embedding": "hazir" if _gomucu.get("g") else ("yukleniyor" if "g" not in _gomucu else "yok"),
         **ayarlar.ozet(),
         "gemini_secenekleri": GEMINI_SECENEKLERI,
@@ -117,7 +125,7 @@ def ayarlari_kaydet(istek: AyarIstegi) -> dict[str, Any]:
     if istek.gemini_model and istek.gemini_model not in {s["id"] for s in GEMINI_SECENEKLERI}:
         raise HTTPException(422, "Bilinmeyen model.")
     ayarlar.kaydet({"LLM_BASE_URL": istek.llm_base_url, "GEMINI_API_KEY": istek.gemini_api_key,
-                    "GEMINI_MODEL": istek.gemini_model})
+                    "GEMINI_MODEL": istek.gemini_model, "CV_MOTOR": istek.motor})
     return durum()
 
 

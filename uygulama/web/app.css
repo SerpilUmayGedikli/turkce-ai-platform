@@ -427,3 +427,9 @@ button.kucuk { padding: 6px 12px !important; font-size: 13px !important; }
 .son7 .gun i:not([style*="height:0%"]) { background: var(--kalem); }
 .son7 .gun.bugun b { color: var(--murekkep); font-weight: 600; }
 .son7 .gun b { font-size: 10.5px; font-weight: 400; color: var(--soluk); }
+
+/* ---------------------------------------------------------------- motor seçimi */
+.uyari-serit.bilgi { background: var(--panel); color: var(--murekkep); border: 1px solid var(--cizgi); }
+.uyari-serit.bilgi strong { color: var(--kalem); }
+.ayar-alt { margin: 10px 0 -4px; font-size: 15px; }
+#motor-secimi .mod > span > span { display: block; }

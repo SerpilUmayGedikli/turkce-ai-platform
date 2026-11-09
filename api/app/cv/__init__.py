@@ -7,13 +7,15 @@ Komut satırı:
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 
 from openai import OpenAI
 
+from . import cevrimdisi, yazici
 from .eslestirme import Analiz, analiz_et, varsayilan_gomucu
 from .okuyucu import Baslik, baslik_cikar
-from .yazici import UyarlanmisCV, uyarla
+from .yazici import UyarlanmisCV, denetle, korunanlari_denetle, uyarla
 
 __all__ = ["Sonuc", "calistir", "analiz_et", "Analiz", "UyarlanmisCV"]
 
@@ -48,8 +50,29 @@ def calistir(cv_metni: str, ilan: str, ad: str = "", dil: str = "ilan",
         gomucu = varsayilan_gomucu()
     baslik = baslik_cikar(cv_metni, ad or None)
     once = analiz_et(cv_metni, ilan, gomucu)
-    yeni = uyarla(cv_metni, ilan, once, ad=baslik.ad, dil=dil, client=client, modeller=modeller,
-                  mod=mod, onceki=onceki, ek=ek)
+
+    # Motor seçimi: "cevrimdisi" ayarı ya da hiç model bağlantısı yoksa (anahtar yok, Ollama yok)
+    # yerel kurallarla çalışan çevrimdışı motor; model hata verirse (kota, ağ) ona düşülür.
+    def cevrimdisi_calistir(not_: str = "") -> Sonuc:
+        yeni = cevrimdisi.uyarla(cv_metni, ilan, once, ad=baslik.ad, dil=dil, mod=mod, ek=ek, gomucu=gomucu)
+        if not_:
+            yeni.degisiklikler.insert(0, not_)
+        yeni.uydurma_supheleri = denetle(cv_metni, yeni, ek)
+        korunanlari_denetle(cv_metni, once, yeni)
+        return Sonuc(baslik, once, analiz_et(yeni.duz_metin(), ilan, gomucu), yeni)
+
+    motor = os.getenv("CV_MOTOR", "otomatik")  # otomatik | yerel | cevrimdisi
+    if client is None and motor == "yerel":
+        client, modeller = yazici.ollama_baglanti()
+    elif client is None and motor != "cevrimdisi":
+        client, modeller = yazici.baglanti()
+    if motor == "cevrimdisi" or client is None:
+        return cevrimdisi_calistir()
+    try:
+        yeni = uyarla(cv_metni, ilan, once, ad=baslik.ad, dil=dil, client=client, modeller=modeller,
+                      mod=mod, onceki=onceki, ek=ek)
+    except RuntimeError as e:
+        return cevrimdisi_calistir(f"Model cevap veremedi ({str(e)[:120]}); CV çevrimdışı motorla uyarlandı.")
     sonra = analiz_et(yeni.duz_metin(), ilan, gomucu)
 
     if oto_tur and mod == "hedef" and sonra.skor < HEDEF_SKOR and _zayiflar(sonra):

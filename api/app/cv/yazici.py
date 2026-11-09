@@ -207,7 +207,32 @@ def baglanti() -> tuple[OpenAI | None, list[str]]:
         # 4 dk sonra sıradaki modele geç; geçici 429/503 için bir kez yeniden dener.
         return (OpenAI(base_url=GEMINI_URL, api_key=os.environ["GEMINI_API_KEY"],
                        timeout=240, max_retries=1), gemini_modelleri())
+    # Yerel model (Ollama) burada denenmez: işlemcide bir uyarlama 15 dakikayı bulabiliyor.
+    # Yalnızca Ayarlar'da bilerek "yerel" seçilirse kullanılır; yoksa çevrimdışı motor çalışır.
     return None, []
+
+
+def ollama_baglanti() -> tuple[OpenAI | None, list[str]]:
+    """Anahtarsız ve internetsiz yerel model: bilgisayarda Ollama çalışıyorsa onu kullanır.
+    Büyük modeller işlemcide yavaştır; bu yüzden zaman aşımı uzun tutulur."""
+    ollama = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+    if _ulasilabilir(ollama, 0.3):
+        model = os.getenv("OLLAMA_MODEL") or _ollama_modeli(ollama)
+        if model:
+            return OpenAI(base_url=f"{ollama}/v1", api_key="ollama", timeout=900, max_retries=0), [model]
+    return None, []
+
+
+def _ollama_modeli(adres: str) -> str:
+    """Ollama'da yüklü ilk sohbet modeli (embedding modelleri atlanır)."""
+    import urllib.request  # noqa: PLC0415
+
+    try:
+        with urllib.request.urlopen(f"{adres}/api/tags", timeout=2) as yanit:
+            modeller = [m["name"] for m in json.load(yanit).get("models", [])]
+    except (OSError, ValueError, KeyError):
+        return ""
+    return next((m for m in modeller if "embed" not in m), "")
 
 
 def _gizle(metin: str, kalkan: Maskeleyici, ad: str) -> str:
