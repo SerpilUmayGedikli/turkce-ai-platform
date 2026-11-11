@@ -149,70 +149,79 @@ def pdf_yaz(baslik: Baslik, cv: UyarlanmisCV) -> bytes:
         raise RuntimeError("PDF için Unicode font bulunamadı (Arial/DejaVu). DOCX çıktısını kullanın.")
 
     b = _bolum_adlari(cv)
-    pdf = FPDF(format="A4")
-    pdf.set_margins(18, 16, 18)
-    pdf.set_auto_page_break(True, 16)
-    pdf.add_font("cv", "", font[0])
-    pdf.add_font("cv", "B", font[1])
-    pdf.add_page()
-    genislik = pdf.w - pdf.l_margin - pdf.r_margin
 
-    def yaz(metin: str, boyut: float = 10, kalin: bool = False, hiza: str = "L", h: float = 5) -> None:
-        pdf.set_font("cv", "B" if kalin else "", boyut)
-        pdf.multi_cell(genislik, h, metin, align=hiza, new_x="LMARGIN", new_y="NEXT")
+    def ciz(olcek: float, kenar: float) -> FPDF:
+        pdf = FPDF(format="A4")
+        pdf.set_margins(18 * kenar, 16 * kenar, 18 * kenar)
+        pdf.set_auto_page_break(True, 16 * kenar)
+        pdf.add_font("cv", "", font[0])
+        pdf.add_font("cv", "B", font[1])
+        pdf.add_page()
+        genislik = pdf.w - pdf.l_margin - pdf.r_margin
 
-    def bolum(metin: str) -> None:
-        pdf.ln(3)
-        pdf.set_text_color(31, 58, 95)
-        yaz(_buyuk(metin, cv), 11, True, h=6)
-        pdf.set_draw_color(31, 58, 95)
-        pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(1.5)
+        def yaz(metin: str, boyut: float = 10, kalin: bool = False, hiza: str = "L", h: float = 5) -> None:
+            pdf.set_font("cv", "B" if kalin else "", boyut * olcek)
+            pdf.multi_cell(genislik, h * olcek, metin, align=hiza, new_x="LMARGIN", new_y="NEXT")
 
-    def madde(metin: str) -> None:
-        pdf.set_font("cv", "", 10)
-        pdf.set_x(pdf.l_margin + 3)
-        pdf.multi_cell(genislik - 3, 5, f"•  {metin}", new_x="LMARGIN", new_y="NEXT")
+        def bolum(metin: str) -> None:
+            pdf.ln(3 * olcek)
+            pdf.set_text_color(31, 58, 95)
+            yaz(_buyuk(metin, cv), 11, True, h=6)
+            pdf.set_draw_color(31, 58, 95)
+            pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(1.5 * olcek)
 
-    if baslik.ad:
-        yaz(baslik.ad, 18, True, "C", 9)
-    if cv.unvan:
-        yaz(cv.unvan, 11, hiza="C", h=6)
-    if baslik.iletisim:
-        yaz(" | ".join(baslik.iletisim), 9, hiza="C")
-    if cv.ozet:
-        bolum(b["ozet"])
-        yaz(cv.ozet)
-    if cv.beceriler:
-        bolum(b["beceri"])
-        if any(":" in x for x in cv.beceriler):
-            for satir in cv.beceriler:
-                yaz(satir)
-        else:
-            yaz(" • ".join(cv.beceriler))
-    if cv.deneyim:
-        bolum(b["deneyim"])
-        for d in cv.deneyim:
-            sol, tarih = _deneyim_basligi(d)
-            yaz(f"{sol}   {tarih}".strip(), 10.5, True, h=6)
-            for m in d.get("maddeler", []):
-                madde(m)
-            pdf.ln(1)
-    if cv.projeler:
-        bolum(b["proje"])
-        for pr in cv.projeler:
-            yaz(_proje_basligi(pr), 10.5, True, h=6)
-            for m in pr.get("maddeler", []):
-                madde(m)
-            pdf.ln(1)
-    if cv.egitim:
-        bolum(b["egitim"])
-        for e in cv.egitim:
-            yaz(f"{_egitim_satiri(e)}   {e.get('tarih') or ''}".strip(), 10.5, True, h=6)
-    for blok in cv.diger:
-        if blok.get("maddeler"):
-            bolum(blok.get("baslik", ""))
-            for m in blok["maddeler"]:
-                madde(m)
+        def madde(metin: str) -> None:
+            pdf.set_font("cv", "", 10 * olcek)
+            pdf.set_x(pdf.l_margin + 3)
+            pdf.multi_cell(genislik - 3, 5 * olcek, f"•  {metin}", new_x="LMARGIN", new_y="NEXT")
+
+        if baslik.ad:
+            yaz(baslik.ad, 18, True, "C", 9)
+        if cv.unvan:
+            yaz(cv.unvan, 11, hiza="C", h=6)
+        if baslik.iletisim:
+            yaz(" | ".join(baslik.iletisim), 9, hiza="C")
+        if cv.ozet:
+            bolum(b["ozet"])
+            yaz(cv.ozet)
+        if cv.beceriler:
+            bolum(b["beceri"])
+            if any(":" in x for x in cv.beceriler):
+                for satir in cv.beceriler:
+                    yaz(satir)
+            else:
+                yaz(" • ".join(cv.beceriler))
+        if cv.deneyim:
+            bolum(b["deneyim"])
+            for d in cv.deneyim:
+                sol, tarih = _deneyim_basligi(d)
+                yaz(f"{sol}   {tarih}".strip(), 10.5, True, h=6)
+                for m in d.get("maddeler", []):
+                    madde(m)
+                pdf.ln(1 * olcek)
+        if cv.projeler:
+            bolum(b["proje"])
+            for pr in cv.projeler:
+                yaz(_proje_basligi(pr), 10.5, True, h=6)
+                for m in pr.get("maddeler", []):
+                    madde(m)
+                pdf.ln(1 * olcek)
+        if cv.egitim:
+            bolum(b["egitim"])
+            for e in cv.egitim:
+                yaz(f"{_egitim_satiri(e)}   {e.get('tarih') or ''}".strip(), 10.5, True, h=6)
+        for blok in cv.diger:
+            if blok.get("maddeler"):
+                bolum(blok.get("baslik", ""))
+                for m in blok["maddeler"]:
+                    madde(m)
+        return pdf
+
+    # Junior CV'ler tek sayfa olmalı: taşarsa yazıyı ve boşlukları biraz küçülterek sığdırmayı dene
+    for olcek, kenar in ((1.0, 1.0), (0.95, 0.85), (0.9, 0.75)):
+        pdf = ciz(olcek, kenar)
+        if pdf.page == 1:
+            break
     return bytes(pdf.output())

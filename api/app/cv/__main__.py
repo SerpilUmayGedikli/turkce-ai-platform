@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 from pathlib import Path
 
-from . import calistir
+from . import ayarlar, calistir
 from .cikti import docx_yaz, pdf_yaz
 from .okuyucu import dosyadan
 
@@ -16,7 +17,22 @@ def main() -> None:
     p.add_argument("--ad", default="", help="Ad Soyad (boşsa CV'nin ilk satırı)")
     p.add_argument("--dil", default="ilan", choices=["ilan", "tr", "en"])
     p.add_argument("--cikti", default=".", help="Çıktı klasörü")
+    p.add_argument("--sadece-skor", action="store_true",
+                   help="Uyarlamadan yalnızca bu CV'nin ilana uyum skorunu ve eksiklerini yazar")
     a = p.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows konsolunda Türkçe karakterler bozulmasın
+    ayarlar.uygula()  # uygulamada kaydedilen Gemini anahtarı / motor ayarı burada da geçerli
+
+    if a.sadece_skor:
+        from .eslestirme import analiz_et, varsayilan_gomucu
+        an = analiz_et(dosyadan(a.cv), Path(a.ilan).read_text(encoding="utf-8"), varsayilan_gomucu())
+        print(f"Uyum skoru: {an.skor}")
+        print("Eksik beceriler:", ", ".join(sorted(an.eksik_beceriler)) or "-")
+        print("Geçmeyen anahtar kelimeler:", ", ".join(k.ifade for k in an.anahtarlar if not k.var) or "-")
+        for g in an.gereksinimler:
+            if g.durum != "karşılanıyor":
+                print(f"  zayıf ({g.durum}): {g.metin}")
+        return
 
     s = calistir(dosyadan(a.cv), Path(a.ilan).read_text(encoding="utf-8"), ad=a.ad, dil=a.dil)
     print(f"Uyum skoru: {s.once.skor} -> {s.sonra.skor}  (model: {s.cv.model})")
