@@ -1,5 +1,55 @@
 # Türkçe AI Platformu
 
+> **English summary** — this repository contains two things:
+> 1. **CV Uyarlayıcı** (CV Tailoring App): a desktop app that tailors a CV to a job post with an LLM and checks
+>    the result for invented claims. Details below.
+> 2. **Turkish AI Platform**: experiments for Turkish enterprise use cases: personal-data (KVKK) masking,
+>    Turkish Text-to-SQL, hybrid RAG and an LLM gateway. The rest of this README (in Turkish) covers it.
+>
+> ### CV Uyarlayıcı — LLM-based CV tailoring with a fabrication check
+>
+> You give it a CV (PDF, DOCX or TXT) and a job post. It measures the match locally, rewrites the CV for that
+> post with an LLM, and then checks the new CV against the original, because LLMs like to "improve" a CV by
+> adding skills the candidate does not have.
+>
+> ```
+> CV + job post
+>   1. Local analysis (no LLM): split the post into requirement sentences, match each one to the closest
+>      CV sentence (multilingual embeddings + keyword overlap), extract matched / implied / missing skills
+>      from a ~100-skill TR/EN dictionary  ->  match score
+>   2. Privacy: name, e-mail, phone and links are masked before anything is sent to a model
+>   3. LLM rewrite: reorder, emphasize, use the post's terms; no new facts
+>   4. Local check: skills, numbers and companies that are not in the original CV are flagged "check this"
+>   5. Re-score (before -> after) and export ATS-friendly DOCX and PDF (PDF auto-fits to one page)
+> ```
+>
+> **Model connections** (all through OpenAI-compatible APIs): Gemini, a local Ollama model, or an LLM gateway
+> (LiteLLM / OmniRoute) with a fallback chain. Without any model, an **offline engine** (rules + local ML)
+> still tailors the CV, so the app works without an API key or internet.
+>
+> **Desktop app:** FastAPI backend + plain HTML/CSS/JS interface, shown in its own window with pywebview and
+> packaged as a Windows `.exe` with PyInstaller. A "job sites" screen opens job boards in separate windows;
+> the user logs in herself, and a button saves the current job post into the app (no scraping, no automated
+> applications). Settings and API keys stay on the user's computer.
+>
+> **Honest limits:** the score thresholds and weights were chosen by hand, not fitted on labeled data, so the
+> score is a direction, not a decision. The fabrication check is not complete: in my own tests it missed an
+> invented project, so I still compare the output with the original CV line by line.
+>
+> **Tests:** 36 pytest tests for the CV app (131 in the whole repository).
+>
+> **How it was built:** I built it with AI coding assistants (mainly Claude Code). I defined the features,
+> reviewed and tested the generated code, and used the app for my own job applications.
+>
+> ```bash
+> python -m venv .venv && .venv/Scripts/pip install -r api/requirements.txt pywebview
+> python uygulama/masaustu.py            # desktop window   (or: python uygulama/sunucu.py -> http://localhost:8100)
+> cd api && python -m app.cv app/cv/ornekler/ornek_cv.txt app/cv/ornekler/ornek_ilan.txt --cikti out   # CLI
+> cd api && python -m pytest -q          # tests
+> ```
+> Code: `api/app/cv/` (matching: `eslestirme.py`, LLM + checks: `yazici.py`, offline engine: `cevrimdisi.py`,
+> DOCX/PDF: `cikti.py`, API: `web_api.py`), interface: `uygulama/`.
+
 Açık kaynak bileşenleri birleştiren, çok modelli ve araç kullanan bir **Türkçe agent ekosistemi**.
 Hedef sohbet botu değil: kurumsal Türkçe kullanım senaryoları için ölçülebilir bir altyapı
 (KVKK uyumlu veri maskeleme, Türkçe Text-to-SQL, Türkçe RAG, model karşılaştırma).
